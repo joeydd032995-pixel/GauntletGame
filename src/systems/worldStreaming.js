@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeBarkMaterial, makeFoliageMaterial, makeStoneMaterial } from './materials.js';
 
 function hash2(x,z,seed=1337){let h=(x*374761393+z*668265263+seed*982451653)|0;h=(h^(h>>>13))*1274126177;return ((h^(h>>>16))>>>0)/4294967295;}
 
@@ -6,9 +7,7 @@ export class WorldStreamer {
   constructor({ scene, camera, heightFn, chunkSize=28, radius=3 }) {
     this.scene=scene;this.camera=camera;this.heightFn=heightFn;this.chunkSize=chunkSize;this.radius=Math.min(radius,2);
     this.chunks=new Map();this.pool=[];this.lastCX=Infinity;this.lastCZ=Infinity;
-    this.trunkMat=new THREE.MeshStandardMaterial({color:0x563d2e,roughness:.91});
-    this.leafMat=new THREE.MeshStandardMaterial({color:0x3f674f,roughness:.82});
-    this.rockMat=new THREE.MeshStandardMaterial({color:0x737c79,roughness:.84,metalness:.035});
+    this.trunkMat=makeBarkMaterial();this.leafMat=makeFoliageMaterial();this.rockMat=makeStoneMaterial();
     this.treeTrunkGeo=new THREE.CylinderGeometry(.16,.38,4.6,10);
     this.treeCrownGeo=new THREE.IcosahedronGeometry(1.35,2);
     this.rockGeo=new THREE.DodecahedronGeometry(.68,1);
