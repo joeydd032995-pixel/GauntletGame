@@ -11,6 +11,8 @@ import { WorldStreamer } from './systems/worldStreaming.js';
 import { EnemyCombatBrain } from './systems/enemyAI.js';
 import { createRenderingPipeline, configureHeroLightRig, createContactShadow } from './systems/rendering.js';
 import { buildRuinArena, buildCrystalField } from './systems/environment.js';
+import { ThirdPersonCameraRig } from './systems/cameraRig.js';
+import { applyHeroArtPass, applyEnemyArtPass } from './systems/characterArt.js';
 
 const app=document.querySelector('#app');
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x071116);scene.fog=new THREE.FogExp2(0x09161a,.0065);
@@ -20,16 +22,17 @@ const rendering=createRenderingPipeline(renderer,scene,camera);const lights=conf
 
 const heightFn=(x,z)=>Math.sin(x*.075)*1.65+Math.cos(z*.058)*1.12+Math.sin((x+z)*.13)*.48+Math.sin(x*.021-z*.026)*1.25-Math.exp(-(x*x+z*z)/430)*1.2;
 const normalFn=(x,z,out)=>terrainNormalFromHeight(heightFn,x,z,out);
+const cameraRig=new ThirdPersonCameraRig(camera,{heightFn});
 const {mesh:terrain}=createLayeredTerrain({size:240,segments:180,heightFn});scene.add(terrain);
 const physics=new PhysicsWorld({terrainHeight:heightFn,terrainNormal:normalFn});
 const world=new WorldStreamer({scene,camera,heightFn,chunkSize:30,radius:2});
 let seed=712367;const rng=()=>((seed=(seed*48271)%2147483647)/2147483647);
 buildRuinArena({scene,physics,heightFn,rng});buildCrystalField({scene,heightFn,rng});
 
-const heroRig=createHeroRig(),hero=heroRig.group;hero.position.set(0,heightFn(0,4),4);scene.add(hero);
+const heroRig=createHeroRig();applyHeroArtPass(heroRig);const hero=heroRig.group;hero.position.set(0,heightFn(0,4),4);scene.add(hero);
 const heroBody=physics.createCharacter(hero.position,{radius:.43,height:1.9,stepHeight:.44,slopeLimit:.7,acceleration:38,braking:46});
 const heroAnim=new AnimationGraph({root:hero,clips:createProceduralClips(heroRig),terrainHeight:heightFn,terrainNormal:normalFn});heroAnim.trigger('idle',{loop:true});
-const enemyRig=createEnemyRig(),enemy=enemyRig.group;enemy.position.set(0,heightFn(0,-4),-4);scene.add(enemy);
+const enemyRig=createEnemyRig();applyEnemyArtPass(enemyRig);const enemy=enemyRig.group;enemy.position.set(0,heightFn(0,-4),-4);scene.add(enemy);
 const enemyBody=physics.createCharacter(enemy.position,{radius:.58,height:2.2,stepHeight:.38,slopeLimit:.68,acceleration:24,braking:34});
 const enemyAnim=new AnimationGraph({root:enemy,clips:authorEnemyClips(enemy),terrainHeight:heightFn,terrainNormal:normalFn});enemyAnim.trigger('enemyIdle',{loop:true});
 
@@ -40,17 +43,17 @@ let enemyTelegraph=null;
 
 const dustCount=450,dustGeo=new THREE.BufferGeometry(),dustPos=new Float32Array(dustCount*3);for(let i=0;i<dustCount;i++){dustPos[i*3]=(rng()-.5)*130;dustPos[i*3+1]=rng()*21;dustPos[i*3+2]=(rng()-.5)*130;}dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3));const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0xc1e7df,size:.028,transparent:true,opacity:.24,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(dust);
 
-const keys=new Set();let yaw=0,pitch=.27,dragging=false,lastX=0,lastY=0,stamina=100,hp=100,enemyHp=100,riftT=0,guardT=0,attackT=0,attackWindow=false,dodgeT=0,time=0;
+const keys=new Set();let yaw=0,dragging=false,lastX=0,lastY=0,stamina=100,hp=100,enemyHp=100,riftT=0,guardT=0,attackT=0,attackWindow=false,dodgeT=0,time=0;
 const unlock=()=>audio.unlock().catch(()=>{});addEventListener('pointerdown',unlock,{once:true});addEventListener('keydown',unlock,{once:true});
 addEventListener('keydown',e=>{keys.add(e.code);if(e.repeat)return;
-  if(e.code==='Digit1'&&attackT<=0&&hp>0){attackT=.62;attackWindow=true;heroAnim.trigger('attack',{fade:.035});const dir=new THREE.Vector3(Math.sin(hero.rotation.y),0,Math.cos(hero.rotation.y));vfx.slash({origin:hero.position.clone().add(new THREE.Vector3(0,1.32,0)),direction:dir});audio.playWhoosh(hero.position.clone().add(new THREE.Vector3(0,1.2,0)),1);}
+  if(e.code==='Digit1'&&attackT<=0&&hp>0){attackT=.62;attackWindow=true;heroAnim.trigger('attack',{fade:.035});const dir=new THREE.Vector3(Math.sin(hero.rotation.y),0,Math.cos(hero.rotation.y));vfx.slash({origin:hero.position.clone().add(new THREE.Vector3(0,1.25,0)),direction:dir});audio.playWhoosh(hero.position.clone().add(new THREE.Vector3(0,1.2,0)),1);}
   if(e.code==='Digit2'&&riftT<=0&&hp>0){riftT=4;vfx.rift(hero.position.clone(),{radius:3.6});audio.playRift(hero.position,1);if(hero.position.distanceTo(enemy.position)<8.2&&enemyHp>0){enemyHp=Math.max(0,enemyHp-28);enemyAnim.trigger('enemyHit',{fade:.025});vfx.impact(enemy.position.clone().add(new THREE.Vector3(0,1.5,0)),{color:0x9cecff,count:24,scale:1.15});audio.playImpact(enemy.position,1.15);}}
   if(e.code==='Digit3'&&guardT<=0&&hp>0)guardT=3;
   if(e.code==='Space'&&stamina>=22&&dodgeT<=0&&hp>0){stamina-=22;dodgeT=.55;heroAnim.trigger('dodge',{fade:.025});const d=new THREE.Vector3(Math.sin(hero.rotation.y),0,Math.cos(hero.rotation.y));heroBody.velocity.addScaledVector(d,7.5);audio.playWhoosh(hero.position,.72);}
 });
-addEventListener('keyup',e=>keys.delete(e.code));renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());renderer.domElement.addEventListener('pointerdown',e=>{if(e.button===2){dragging=true;lastX=e.clientX;lastY=e.clientY;}});addEventListener('pointerup',()=>dragging=false);addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.0045;pitch=THREE.MathUtils.clamp(pitch-(e.clientY-lastY)*.0036,-.02,.62);lastX=e.clientX;lastY=e.clientY;});
+addEventListener('keyup',e=>keys.delete(e.code));renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());renderer.domElement.addEventListener('pointerdown',e=>{if(e.button===2){dragging=true;lastX=e.clientX;lastY=e.clientY;}});addEventListener('pointerup',()=>dragging=false);addEventListener('pointermove',e=>{if(!dragging)return;cameraRig.orbit(e.clientX-lastX,e.clientY-lastY);yaw=cameraRig.yaw;lastX=e.clientX;lastY=e.clientY;});
 
-const fwd=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3(),tmp=new THREE.Vector3(),camTarget=new THREE.Vector3(),camDesired=new THREE.Vector3(),worldUp=new THREE.Vector3(0,1,0);
+const fwd=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3(),tmp=new THREE.Vector3(),worldUp=new THREE.Vector3(0,1,0);
 function update(dt){time+=dt;const simDt=vfx.update(dt);riftT=Math.max(0,riftT-dt);guardT=Math.max(0,guardT-dt);attackT=Math.max(0,attackT-dt);dodgeT=Math.max(0,dodgeT-dt);dust.rotation.y+=dt*.004;atmosphere.update(dt,time);world.update(hero.position);
   fwd.set(Math.sin(yaw),0,-Math.cos(yaw));right.set(Math.cos(yaw),0,Math.sin(yaw));move.set(0,0,0);if(keys.has('KeyW'))move.add(fwd);if(keys.has('KeyS'))move.sub(fwd);if(keys.has('KeyD'))move.add(right);if(keys.has('KeyA'))move.sub(right);if(move.lengthSq()>0)move.normalize();
   const sprint=keys.has('ShiftLeft')&&stamina>1&&dodgeT<=0,moveSpeed=sprint?8.4:4.85;heroBody.desiredVelocity.copy(move).multiplyScalar(dodgeT>0?2.5:moveSpeed);
@@ -65,7 +68,7 @@ function update(dt){time+=dt;const simDt=vfx.update(dt);riftT=Math.max(0,riftT-d
   if(hp<=0&&heroAnim.state!=='death'){heroAnim.trigger('death',{fade:.08});heroBody.desiredVelocity.set(0,0,0);}
   heroShadow.update(hero.position,heightFn,.9);enemyShadow.update(enemy.position,heightFn,1.15);enemyShadow.mesh.visible=enemyHp>0;
   const combat=enemyHp>0&&hero.position.distanceTo(enemy.position)<16?1:0;audio.setCombatIntensity(combat,dt);rendering.update(dt,{combat,darkness:.58});lights.fill.position.lerp(hero.position.clone().add(new THREE.Vector3(0,6,4)),1-Math.exp(-dt*2));
-  camTarget.copy(hero.position).add(new THREE.Vector3(0,1.58,0));const dist=5.8,cp=Math.cos(pitch),sp=Math.sin(pitch);camDesired.set(Math.sin(yaw)*cp*dist,1.9+sp*dist,Math.cos(yaw)*cp*dist).add(camTarget);if(vfx.impulse>0)camDesired.add(new THREE.Vector3((Math.random()-.5)*vfx.impulse,(Math.random()-.5)*vfx.impulse,(Math.random()-.5)*vfx.impulse));camera.position.lerp(camDesired,1-Math.exp(-dt*13));camera.lookAt(camTarget);
+  cameraRig.yaw=yaw;cameraRig.update(dt,{player:hero.position,target:enemyHp>0?enemy.position:null,combat:!!combat,impulse:vfx.impulse});
   updateHud(sprint,combat);
 }
 
