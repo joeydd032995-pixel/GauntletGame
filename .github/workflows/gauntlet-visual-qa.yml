@@ -16,7 +16,7 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - name: Start production preview
         run: npm run preview -- --port 4173 > /tmp/gauntlet-preview.log 2>&1 &
       - name: Wait for runtime
