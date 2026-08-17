@@ -1,5 +1,7 @@
 name: Gauntlet Visual QA
 on:
+  push:
+    branches: ['sol/**']
   pull_request:
     branches: [main]
 
