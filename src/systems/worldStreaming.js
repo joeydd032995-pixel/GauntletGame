@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeBarkMaterial, makeFoliageMaterial, makeStoneMaterial } from './materials.js';
 
 function hash2(x,z,seed=1337){let h=(x*374761393+z*668265263+seed*982451653)|0;h=(h^(h>>>13))*1274126177;return ((h^(h>>>16))>>>0)/4294967295;}
+function canopyGeometry(){const parts=[],data=[[0,0,0,1.15,1.25,1.05],[-.72,-.08,.05,.78,.92,.76],[.7,-.04,.12,.8,.95,.8],[.12,.72,-.05,.82,.88,.78],[0,-.15,.58,.7,.82,.72]];for(const [x,y,z,sx,sy,sz] of data){const g=new THREE.IcosahedronGeometry(1,2);g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(sx,sy,sz)));parts.push(g);}const merged=mergeGeometries(parts,false);for(const g of parts)g.dispose();merged.computeVertexNormals();return merged;}
 
 export class WorldStreamer {
   constructor({ scene, camera, heightFn, chunkSize=28, radius=3 }) {
@@ -9,7 +11,7 @@ export class WorldStreamer {
     this.chunks=new Map();this.pool=[];this.lastCX=Infinity;this.lastCZ=Infinity;
     this.trunkMat=makeBarkMaterial();this.leafMat=makeFoliageMaterial();this.rockMat=makeStoneMaterial();
     this.treeTrunkGeo=new THREE.CylinderGeometry(.16,.38,4.6,10);
-    this.treeCrownGeo=new THREE.IcosahedronGeometry(1.35,2);
+    this.treeCrownGeo=canopyGeometry();
     this.rockGeo=new THREE.DodecahedronGeometry(.68,1);
   }
 
@@ -31,7 +33,7 @@ export class WorldStreamer {
       const lx=(rx-.5)*this.chunkSize,lz=(rz-.5)*this.chunkSize,wx=chunk.group.position.x+lx,wz=chunk.group.position.z+lz;
       if(Math.hypot(wx,wz)<18.5)continue;
       const y=this.heightFn(wx,wz);
-      if(kind>.38&&treeIndex<chunk.treeCount){const s=.72+hash2(i,cx+cz)*.58,yaw=hash2(i,cz)*Math.PI*2;const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,yaw,0));const m=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+2.3*s,lz),q,new THREE.Vector3(s,s,s));chunk.trunks.setMatrixAt(treeIndex,m);const crownScale=new THREE.Vector3(s*(.9+hash2(i,17)*.15),s*(1.45+hash2(i,29)*.35),s*(.9+hash2(i,31)*.15));const cm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+4.6*s,lz),q,crownScale);chunk.crowns.setMatrixAt(treeIndex,cm);treeIndex++;}
+      if(kind>.38&&treeIndex<chunk.treeCount){const s=.72+hash2(i,cx+cz)*.58,yaw=hash2(i,cz)*Math.PI*2;const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,yaw,0));const m=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+2.3*s,lz),q,new THREE.Vector3(s,s,s));chunk.trunks.setMatrixAt(treeIndex,m);const crownScale=new THREE.Vector3(s*(1.0+hash2(i,17)*.18),s*(1.05+hash2(i,29)*.2),s*(1.0+hash2(i,31)*.18));const cm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+4.75*s,lz),q,crownScale);chunk.crowns.setMatrixAt(treeIndex,cm);treeIndex++;}
       else if(rockIndex<chunk.rockCount){const s=.45+hash2(i*2,cx-cz)*1.05;const rm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+.3*s,lz),new THREE.Quaternion().setFromEuler(new THREE.Euler(hash2(i,1)*.8,hash2(i,2)*6.28,hash2(i,3)*.8)),new THREE.Vector3(s*1.35,s*.72,s));chunk.rocks.setMatrixAt(rockIndex,rm);rockIndex++;}
     }
     chunk.trunks.count=treeIndex;chunk.crowns.count=treeIndex;chunk.rocks.count=rockIndex;chunk.trunks.instanceMatrix.needsUpdate=chunk.crowns.instanceMatrix.needsUpdate=chunk.rocks.instanceMatrix.needsUpdate=true;
