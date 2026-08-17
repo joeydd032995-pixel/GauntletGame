@@ -1,43 +1,9 @@
 import * as THREE from 'three';
 
-export function createVolumetricAtmosphere({ scene, camera, layers = 18, radius = 95, height = 28 } = {}) {
-  const group = new THREE.Group();
-  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2, 1, 1);
-  const mats = [];
-  for (let i = 0; i < layers; i++) {
-    const depth = i / Math.max(1, layers - 1);
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.NormalBlending,
-      uniforms: {
-        uTime: { value: 0 }, uDepth: { value: depth }, uDensity: { value: 0.028 + depth * 0.018 },
-        uFogColor: { value: new THREE.Color().setHSL(0.53, 0.23, 0.12 + depth * 0.035) },
-        uCamera: { value: camera.position }
-      },
-      vertexShader: `varying vec3 vWorld; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vWorld=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-      fragmentShader: `
-        varying vec3 vWorld; uniform float uTime,uDepth,uDensity; uniform vec3 uFogColor,uCamera;
-        float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
-        float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+1.0),f.x),f.y); }
-        void main(){
-          float dist=distance(vWorld.xz,uCamera.xz); float radial=smoothstep(110.0,8.0,dist);
-          float n=noise(vWorld.xz*.035+vec2(uTime*.007,-uTime*.004)+uDepth*11.0);
-          float density=uDensity*(.45+n*.75)*radial;
-          density*=smoothstep(0.0,.15,uDepth)*smoothstep(1.0,.62,uDepth);
-          gl_FragColor=vec4(uFogColor,density);
-        }`
-    });
-    const plane = new THREE.Mesh(geo, mat);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = -1 + depth * height;
-    group.add(plane); mats.push(mat);
-  }
-  scene.add(group);
-  return {
-    group,
-    update(dt, time) {
-      group.position.x = camera.position.x;
-      group.position.z = camera.position.z;
-      for (const m of mats) m.uniforms.uTime.value = time;
-    }
-  };
+export function createVolumetricAtmosphere({scene,camera,layers=16,radius=110,height=26}={}){
+  const group=new THREE.Group(),mats=[],geo=new THREE.PlaneGeometry(radius*2,radius*2);
+  for(let i=0;i<layers;i++){const depth=i/Math.max(1,layers-1),mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:true,blending:THREE.NormalBlending,side:THREE.DoubleSide,uniforms:{uTime:{value:0},uDepth:{value:depth},uDensity:{value:.018+depth*.014},uFogColor:{value:new THREE.Color().setHSL(.53,.25,.095+depth*.03)},uCamera:{value:camera.position}},vertexShader:`varying vec3 vWorld;void main(){vec4 w=modelMatrix*vec4(position,1.0);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,fragmentShader:`varying vec3 vWorld;uniform float uTime,uDepth,uDensity;uniform vec3 uFogColor,uCamera;float h(vec2 p){p=fract(p*vec2(127.1,311.7));p+=dot(p,p+19.19);return fract(p.x*p.y);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*n(p);p=p*2.03+17.7;a*=.5;}return v;}void main(){float dist=distance(vWorld.xz,uCamera.xz);float radial=1.-smoothstep(45.,115.,dist);float f=fbm(vWorld.xz*.028+vec2(uTime*.004,-uTime*.002)+uDepth*23.);float pockets=smoothstep(.28,.78,f);float layer=smoothstep(.02,.22,uDepth)*smoothstep(1.,.62,uDepth);float density=uDensity*(.35+pockets*.9)*radial*layer;gl_FragColor=vec4(uFogColor,density);}`});const plane=new THREE.Mesh(geo,mat);plane.rotation.x=-Math.PI/2;plane.position.y=-1+depth*height;group.add(plane);mats.push(mat);}
+  const shaftGroup=new THREE.Group(),shaftMat=new THREE.MeshBasicMaterial({color:0xbadfff,transparent:true,opacity:.035,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+  for(let i=0;i<7;i++){const shaft=new THREE.Mesh(new THREE.ConeGeometry(2.2+i*.25,22+i*2,20,1,true),shaftMat.clone());shaft.position.set(-28+i*9,12,-12-i*3);shaft.rotation.z=.22;shaft.rotation.x=-.08;shaftGroup.add(shaft);}scene.add(group,shaftGroup);
+  return{group,shaftGroup,update(dt,time){group.position.x=camera.position.x;group.position.z=camera.position.z;shaftGroup.position.x=camera.position.x*.18;shaftGroup.position.z=camera.position.z*.18;for(const m of mats)m.uniforms.uTime.value=time;for(let i=0;i<shaftGroup.children.length;i++){const s=shaftGroup.children[i];s.material.opacity=.025+.018*(.5+.5*Math.sin(time*.14+i));}}};
 }
