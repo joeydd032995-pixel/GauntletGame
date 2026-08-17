@@ -26,7 +26,7 @@ try{
   await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('02-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
   await page.keyboard.press('1');await page.waitForTimeout(140);mark('03-melee-impact-1080p.png');await page.waitForTimeout(480);
   await page.keyboard.press('2');await page.waitForTimeout(110);mark('04-rift-vfx-1080p.png');await page.waitForTimeout(650);
-  await page.keyboard.press('Space');await page.waitForTimeout(120);mark('05-evade-1080p.png');await page.waitForTimeout(5000);
+  await page.keyboard.press('Space');await page.waitForTimeout(140);mark('05-evade-1080p.png');await page.waitForTimeout(2200);
 }catch(e){fatal=e;errors.push(`capture: ${e.stack||e.message}`);}
 finally{await context.close().catch(()=>{});await browser.close().catch(()=>{});}
 
@@ -43,11 +43,15 @@ if(videoFiles.length){
   const video=path.join('artifacts/video',videoFiles[0]);
   try{
     const ffmpeg=await findFfmpeg();
-    for(const [name,time] of marks){const output=path.join('artifacts/frames',name);try{await exec(ffmpeg,['-loglevel','error','-y','-ss',time.toFixed(3),'-i',video,'-frames:v','1',output],{timeout:30000});if(await validFrame(output))extracted++;else errors.push(`frame ${name}: ffmpeg returned without a non-empty output file`);}catch(e){errors.push(`frame ${name}: ${e.stderr||e.message}`);}}
+    for(let i=0;i<marks.length;i++){
+      const [name,time]=marks[i],output=path.join('artifacts/frames',name),isTail=i===marks.length-1;
+      const seek=isTail?['-sseof','-0.35']:['-ss',time.toFixed(3)];
+      try{await exec(ffmpeg,['-loglevel','error','-y',...seek,'-i',video,'-frames:v','1',output],{timeout:30000});if(await validFrame(output))extracted++;else errors.push(`frame ${name}: ffmpeg returned without a non-empty output file`);}catch(e){errors.push(`frame ${name}: ${e.stderr||e.message}`);}
+    }
     if(extracted!==marks.length){errors.push(`capture: extracted ${extracted}/${marks.length} required evidence frames`);fatal=fatal||new Error('Incomplete rendered evidence set');}
   }catch(e){errors.push(`capture: ${e.message}`);fatal=fatal||e;}
 }else{errors.push('capture: no WebM video produced');fatal=fatal||new Error('No WebM video produced');}
 
-await fs.writeFile('artifacts/capture-marks.json',JSON.stringify({marks:Object.fromEntries(marks),extractedFrames:extracted,requiredFrames:marks.length},null,2));
+await fs.writeFile('artifacts/capture-marks.json',JSON.stringify({marks:Object.fromEntries(marks),extractedFrames:extracted,requiredFrames:marks.length,lastFrameSource:'video-tail'},null,2));
 await fs.writeFile('artifacts/browser-errors.txt',errors.length?errors.join('\n'):'No pageerror, console.error, or evidence-extraction errors detected.\n');
 if(fatal||errors.some(e=>e.startsWith('pageerror:')||e.startsWith('console:')))throw new Error(`Visual QA rejected runtime:\n${errors.join('\n')}`);
