@@ -26,7 +26,7 @@ try{
   await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('02-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
   await page.keyboard.press('1');await page.waitForTimeout(140);mark('03-melee-impact-1080p.png');await page.waitForTimeout(480);
   await page.keyboard.press('2');await page.waitForTimeout(110);mark('04-rift-vfx-1080p.png');await page.waitForTimeout(650);
-  await page.keyboard.press('Space');await page.waitForTimeout(120);mark('05-evade-1080p.png');await page.waitForTimeout(1500);
+  await page.keyboard.press('Space');await page.waitForTimeout(120);mark('05-evade-1080p.png');await page.waitForTimeout(5000);
 }catch(e){fatal=e;errors.push(`capture: ${e.stack||e.message}`);}
 finally{await context.close().catch(()=>{});await browser.close().catch(()=>{});}
 
@@ -36,7 +36,6 @@ async function findFfmpeg(){
   try{for(const dir of await fs.readdir(root)){if(!dir.startsWith('ffmpeg-'))continue;for(const name of ['ffmpeg-linux','ffmpeg']){const candidate=path.join(root,dir,name);try{await fs.access(candidate);return candidate;}catch{}}}}catch{}
   throw new Error('Playwright FFmpeg binary not found');
 }
-
 async function validFrame(file){try{const s=await fs.stat(file);return s.isFile()&&s.size>4096;}catch{return false;}}
 
 const videoFiles=(await fs.readdir('artifacts/video')).filter(f=>f.endsWith('.webm'));let extracted=0;
