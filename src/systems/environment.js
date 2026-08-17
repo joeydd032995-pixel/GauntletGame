@@ -1,29 +1,41 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeStoneMaterial, makeCrystalMaterial, makeFoliageMaterial } from './materials.js';
 
+function brokenWallGeometry(){
+  const s=new THREE.Shape();s.moveTo(-.72,0);s.lineTo(.7,0);s.lineTo(.67,.86);s.lineTo(.48,1.18);s.lineTo(.18,1.08);s.lineTo(-.08,1.45);s.lineTo(-.36,1.32);s.lineTo(-.7,1.02);s.closePath();
+  const g=new THREE.ExtrudeGeometry(s,{depth:.48,steps:1,bevelEnabled:true,bevelSegments:2,bevelSize:.055,bevelThickness:.055,curveSegments:3});g.translate(0,0,-.24);g.computeVertexNormals();return g;
+}
+function grassClumpGeometry(){
+  const parts=[];
+  for(let b=0;b<6;b++){
+    const rows=5,verts=[],idx=[],angle=b/6*Math.PI*2+.27*(b%2),h=.42+(b%3)*.08,w=.055+(b%2)*.018;
+    for(let r=0;r<=rows;r++){const t=r/rows,width=w*(1-t*.88),bend=t*t*.11;for(const side of [-1,1]){const lx=side*width,ly=t*h,lz=bend;const x=lx*Math.cos(angle)+lz*Math.sin(angle),z=-lx*Math.sin(angle)+lz*Math.cos(angle);verts.push(x,ly,z);}}
+    for(let r=0;r<rows;r++){const a=r*2,b0=a+1,c=a+2,d=a+3;idx.push(a,c,b0,b0,c,d);}
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();parts.push(g);
+  }
+  const merged=mergeGeometries(parts,false);for(const p of parts)p.dispose();return merged;
+}
+
 export function buildRuinArena({scene,physics,heightFn,rng}){
-  const root=new THREE.Group();root.name='RuinArena';scene.add(root);const stone=makeStoneMaterial();
-  const rubbleGeo=new THREE.DodecahedronGeometry(1,1),columnGeo=new THREE.CylinderGeometry(.48,.64,1,14,4),slabGeo=new THREE.BoxGeometry(1,1,1,3,1,3);
+  const root=new THREE.Group();root.name='RuinArena';scene.add(root);const stone=makeStoneMaterial(),wallGeo=brokenWallGeometry(),columnGeo=new THREE.CylinderGeometry(.48,.64,1,18,5),slabGeo=new THREE.BoxGeometry(1,1,1,4,1,4),rubbleGeo=new THREE.DodecahedronGeometry(.35,1);
   for(let i=0;i<18;i++){
-    const a=i/18*Math.PI*2,r=10.8+(i%3)*.65,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=-a+(rng()-.5)*.35;
-    if(i%4===0){const h=2.8+rng()*1.6,col=new THREE.Mesh(columnGeo,stone);col.scale.set(.86,h,.86);col.position.y=h*.5;col.rotation.z=(rng()-.5)*.08;col.castShadow=col.receiveShadow=true;g.add(col);const cap=new THREE.Mesh(new THREE.DodecahedronGeometry(.68,1),stone);cap.scale.set(1.1,.38,1.1);cap.position.y=h+.18;cap.rotation.set(rng()*.2,rng()*6.28,rng()*.15);cap.castShadow=true;g.add(cap);physics.addBox(new THREE.Vector3(x,y+h*.5,z),new THREE.Vector3(.55,h*.5,.55));}
-    else{const pieces=2+(i%2);let top=.15;for(let j=0;j<pieces;j++){const rock=new THREE.Mesh(rubbleGeo,stone);const sy=.7+rng()*1.15,sx=.58+rng()*.5,sz=.5+rng()*.45;rock.scale.set(sx,sy,sz);rock.position.set((rng()-.5)*.24,top+sy*.72,(rng()-.5)*.2);rock.rotation.set((rng()-.5)*.18,rng()*6.28,(rng()-.5)*.16);rock.castShadow=rock.receiveShadow=true;g.add(rock);top+=sy*1.12;}physics.addBox(new THREE.Vector3(x,y+top*.45,z),new THREE.Vector3(.7,top*.45,.65));}
+    const a=i/18*Math.PI*2,r=10.7+(i%3)*.72,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=-a+(rng()-.5)*.28;
+    if(i%5===0){const h=2.7+rng()*1.45,col=new THREE.Mesh(columnGeo,stone);col.scale.set(.82,h,.82);col.position.y=h*.5;col.rotation.z=(rng()-.5)*.055;col.castShadow=col.receiveShadow=true;g.add(col);const cap=new THREE.Mesh(new THREE.CylinderGeometry(.68,.62,.22,18),stone);cap.position.y=h+.08;cap.castShadow=true;g.add(cap);physics.addBox(new THREE.Vector3(x,y+h*.5,z),new THREE.Vector3(.52,h*.5,.52));}
+    else{const wall=new THREE.Mesh(wallGeo,stone);const sx=.78+rng()*.58,sy=.9+rng()*.7;wall.scale.set(sx,sy,.82+rng()*.28);wall.rotation.z=(rng()-.5)*.075;wall.castShadow=wall.receiveShadow=true;g.add(wall);for(let j=0;j<2;j++){const rubble=new THREE.Mesh(rubbleGeo,stone);const rs=.45+rng()*.75;rubble.scale.set(rs*1.3,rs*.65,rs);rubble.position.set((rng()-.5)*1.15,.12+rs*.16,(rng()-.5)*.75);rubble.rotation.set(rng(),rng()*6.28,rng());rubble.castShadow=true;g.add(rubble);}physics.addBox(new THREE.Vector3(x,y+.68*sy,z),new THREE.Vector3(.72*sx,.7*sy,.42));}
     root.add(g);
   }
-  for(let i=0;i<16;i++){const a=i/16*Math.PI*2,r=7.55+(i%2)*.35,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),slab=new THREE.Mesh(slabGeo,stone);slab.scale.set(1.55,.12,.78);slab.position.set(x,y+.025,z);slab.rotation.set((rng()-.5)*.025,-a+(rng()-.5)*.12,(rng()-.5)*.02);slab.castShadow=false;slab.receiveShadow=true;root.add(slab);}
-  const archMat=stone;for(const a of [0,Math.PI]){const r=11.4,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),gate=new THREE.Group();gate.position.set(x,y,z);gate.rotation.y=-a;for(const s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.38,.52,3.5,14,4),archMat);p.position.set(s*1.22,1.75,0);p.rotation.z=s*.025;p.castShadow=p.receiveShadow=true;gate.add(p);}const arch=new THREE.Mesh(new THREE.TorusGeometry(1.22,.32,12,36,Math.PI),archMat);arch.position.y=3.45;arch.rotation.z=Math.PI;arch.rotation.y=Math.PI/2;arch.castShadow=true;gate.add(arch);root.add(gate);}
-  const rune=new THREE.Mesh(new THREE.RingGeometry(2.4,2.48,96),new THREE.MeshBasicMaterial({color:0x52cce8,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));rune.rotation.x=-Math.PI/2;rune.position.set(0,heightFn(0,0)+.035,0);root.add(rune);
+  for(let i=0;i<16;i++){const a=i/16*Math.PI*2,r=7.55+(i%2)*.34,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),slab=new THREE.Mesh(slabGeo,stone);slab.scale.set(1.45,.1,.72);slab.position.set(x,y+.02,z);slab.rotation.set((rng()-.5)*.02,-a+(rng()-.5)*.1,(rng()-.5)*.018);slab.receiveShadow=true;root.add(slab);}
+  for(const a of [0,Math.PI]){const r=11.35,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),gate=new THREE.Group();gate.position.set(x,y,z);gate.rotation.y=-a;for(const s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.38,.52,3.5,18,4),stone);p.position.set(s*1.22,1.75,0);p.rotation.z=s*.025;p.castShadow=p.receiveShadow=true;gate.add(p);}const arch=new THREE.Mesh(new THREE.TorusGeometry(1.22,.3,14,42,Math.PI),stone);arch.position.y=3.44;arch.rotation.z=Math.PI;arch.rotation.y=Math.PI/2;arch.castShadow=true;gate.add(arch);root.add(gate);}
+  const rune=new THREE.Mesh(new THREE.RingGeometry(2.4,2.47,96),new THREE.MeshBasicMaterial({color:0x52cce8,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));rune.rotation.x=-Math.PI/2;rune.position.set(0,heightFn(0,0)+.035,0);root.add(rune);
   if(!scene.getObjectByName('GroundDetail'))buildGroundDetail({scene,heightFn,rng});
   return root;
 }
 
 export function buildGroundDetail({scene,heightFn,rng}){
-  const root=new THREE.Group();root.name='GroundDetail';scene.add(root);
-  const grassMat=makeFoliageMaterial();grassMat.side=THREE.DoubleSide;const bladeGeo=new THREE.PlaneGeometry(.13,.5,1,3);bladeGeo.translate(0,.25,0);
-  const grass=new THREE.InstancedMesh(bladeGeo,grassMat,520);grass.frustumCulled=true;grass.castShadow=false;grass.receiveShadow=true;
-  let gi=0;for(let i=0;i<700&&gi<520;i++){const a=rng()*Math.PI*2,r=4.4+Math.sqrt(rng())*13.5,x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(r-7.7)<.65)continue;const y=heightFn(x,z),s=.55+rng()*.75,q=new THREE.Quaternion().setFromEuler(new THREE.Euler((rng()-.5)*.12,rng()*Math.PI*2,(rng()-.5)*.12)),m=new THREE.Matrix4().compose(new THREE.Vector3(x,y+.015,z),q,new THREE.Vector3(s,s,s));grass.setMatrixAt(gi++,m);}grass.count=gi;grass.instanceMatrix.needsUpdate=true;root.add(grass);
-  const pebbleGeo=new THREE.DodecahedronGeometry(.12,1),pebbles=new THREE.InstancedMesh(pebbleGeo,makeStoneMaterial(),180);let pi=0;for(let i=0;i<240&&pi<180;i++){const a=rng()*Math.PI*2,r=4+rng()*13.5,x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(r-7.7)<.5)continue;const y=heightFn(x,z),s=.45+rng()*1.35,m=new THREE.Matrix4().compose(new THREE.Vector3(x,y+.05*s,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rng(),rng()*6.28,rng())),new THREE.Vector3(s*1.2,s*.6,s));pebbles.setMatrixAt(pi++,m);}pebbles.count=pi;pebbles.instanceMatrix.needsUpdate=true;pebbles.castShadow=false;pebbles.receiveShadow=true;root.add(pebbles);
-  return root;
+  const root=new THREE.Group();root.name='GroundDetail';scene.add(root);const grassMat=makeFoliageMaterial();grassMat.side=THREE.DoubleSide;const clumpGeo=grassClumpGeometry(),grass=new THREE.InstancedMesh(clumpGeo,grassMat,360);grass.frustumCulled=true;grass.castShadow=false;grass.receiveShadow=true;
+  let gi=0;for(let i=0;i<520&&gi<360;i++){const a=rng()*Math.PI*2,r=4.6+Math.sqrt(rng())*13.1,x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(r-7.7)<.72)continue;const y=heightFn(x,z),s=.55+rng()*.82,q=new THREE.Quaternion().setFromEuler(new THREE.Euler((rng()-.5)*.08,rng()*Math.PI*2,(rng()-.5)*.08)),m=new THREE.Matrix4().compose(new THREE.Vector3(x,y+.012,z),q,new THREE.Vector3(s,s,s));grass.setMatrixAt(gi++,m);}grass.count=gi;grass.instanceMatrix.needsUpdate=true;root.add(grass);
+  const pebbleGeo=new THREE.DodecahedronGeometry(.12,1),pebbles=new THREE.InstancedMesh(pebbleGeo,makeStoneMaterial(),150);let pi=0;for(let i=0;i<210&&pi<150;i++){const a=rng()*Math.PI*2,r=4+rng()*13.3,x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(r-7.7)<.5)continue;const y=heightFn(x,z),s=.45+rng()*1.25,m=new THREE.Matrix4().compose(new THREE.Vector3(x,y+.05*s,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rng(),rng()*6.28,rng())),new THREE.Vector3(s*1.2,s*.6,s));pebbles.setMatrixAt(pi++,m);}pebbles.count=pi;pebbles.instanceMatrix.needsUpdate=true;pebbles.receiveShadow=true;root.add(pebbles);return root;
 }
 
 export function buildCrystalField({scene,heightFn,rng}){
