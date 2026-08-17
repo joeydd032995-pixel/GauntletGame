@@ -1,99 +1,124 @@
 # GAUNTLET Quality Protocol
 
-This repository uses an explicit specialist/critic workflow. No system is marked AAA-complete from code inspection alone, and no reference-game superiority claim is permitted without rendered evidence.
+No system is marked AAA-complete from code inspection alone. No World of Warcraft / Old School RuneScape superiority claim is permitted without rendered evidence. Every system moves through **REJECTED → PLAYABLE → CANDIDATE → ACCEPTED**.
 
-## Specialist lanes
+## Evidence gates
 
-- Rendering / PBR / anti-aliasing / post-processing
-- Lighting / shadowing / contact grounding / atmospheric composition
-- Character controller / collision / slope response / IK
-- Animation graph / locomotion / motion matching / root motion
-- Combat / enemy state machine / telegraphs / hit confirmation
-- Camera / targeting / motion feel
-- VFX / particles / decals / hit-stop / screen feedback
-- World generation / environmental composition / streaming / LOD
-- UI / HUD / encounter readability / accessibility
-- Audio / spatial mix / combat layering
-- Performance / GPU budgets / loading
-- Automated build / browser / rendered-frame QA
+- **Gauntlet Build Gate** — production Vite build + bundle verification.
+- **Gauntlet Visual QA** — production preview in Chromium, scripted locomotion/melee/Rift/evade sequence, WebM recording, five required 1920×1080 extracted frames, browser error capture, and render telemetry.
+- Visual QA now runs on every `sol/**` push and pull-request update.
+- A missing/empty evidence frame fails the gate.
 
-## Critic states
+## Rendered critic history
 
-1. **REJECTED** — incomplete, broken, placeholder-grade or unverified.
-2. **PLAYABLE** — works, but evidence does not support benchmark quality.
-3. **CANDIDATE** — implementation is integrated and ready for rendered QA.
-4. **ACCEPTED** — passes build/runtime evidence, capture review and performance target.
+### Early black-frame rejection
+The first real Chromium artifact showed the HUD over an almost black 3D scene. Cause: double-dark terrain modulation combined with an excessive headless render budget (4096² shadow, 49 chunks, 18 atmosphere layers, 16 point lights, transmission). **REJECTED.**
 
-## Pass 3 — forced upgrade
+### Run 9 rejection
+Usable video showed combat obstructed by streamed vegetation, primitive character art, and melee/Rift effects becoming broad overexposed wedges. **REJECTED.** Arena carve-out, VFX hierarchy and render budgets were rebuilt.
 
-### Animation / motion matching / IK — CANDIDATE
-- Mixer state graph with forced combat states and locomotion selection.
-- Motion matching cost includes speed, acceleration, turn rate, grounded/combat state and directional intent.
-- Transition hysteresis prevents locomotion clip chatter.
-- Root translation is extracted from the animated hips and consumed by gameplay for attacks/evades.
-- Foot IK is bind-pose-relative instead of cumulative; ankle slope alignment, shin compensation and hip lowering are damped against terrain samples.
-- Hero clips now animate hips, opposing legs, knees, arms, attack anticipation/follow-through, evade, hit and death.
+### Run 14 rejection
+The runtime passed end-to-end, but screenshots showed a rigid cape card, floating-looking enemy lower body, box-ring ruins and visibly primitive characters. **REJECTED.** Enemy IK naming, cloth segmentation, materials and arena geometry were rebuilt.
 
-**Critic hold:** rendered motion evidence is required before foot sliding, transition quality or weight can be graded.
+### Run 19 / 23 rejection
+Mapped PBR materials and character shells improved technical response, but rendered characters still read as procedural mannequins and player/target composition lacked separation. **REJECTED.** Target-aware shoulder camera, armor shell, authored-material pipeline and VFX signatures were rebuilt.
 
-### Character art — CANDIDATE prototype
-- Hero silhouette rebuilt with layered breastplate, waist armor, pauldrons, mantle, hood, cape, boots, weapon guard/pommel and higher subdivision.
-- Physical materials use metal/roughness, clearcoat, sheen and emissive weapon response.
-- Enemy silhouette gains chest armor, articulated legs and higher-fidelity materials.
+### Run 29 / 37 rejection
+Frames exposed stick-like grass, rock-mass foliage, repeated generated ruins, fake geometric light-shaft bands, weak parallax and incomplete fifth-frame evidence. **REJECTED.** Light shafts were removed, ruins moved to irregular extruded architecture, grass to multi-blade clumps, foliage to leaf-card clusters, camera parallax increased, and evidence extraction now uses the actual video tail for the final frame.
 
-**Critic hold:** these are still procedural original characters, not final authored production meshes. Do not call them final character art.
+## Current specialist state
+
+### Animation / motion matching / root motion / IK — CANDIDATE
+- AnimationMixer state graph with forced combat states.
+- Motion matcher scores speed, acceleration, angular speed, direction, grounded state and combat context with transition hysteresis.
+- Root motion extracted from animated hips and consumed by gameplay attacks/evades.
+- Bind-pose-relative foot IK with terrain-normal ankle alignment, shin compensation and hip lowering.
+- Enemy leg naming standardized so the same terrain-aware solver reaches both feet.
+
+**Hold:** motion/video review is still required for foot sliding, turn quality and combat weight.
 
 ### Physics / controller — CANDIDATE
-- Acceleration/braking separated from desired velocity.
-- Air control, capped fall velocity, adaptive substeps, iterative penetration solve, velocity projection, slope slide and step-up behavior.
-- Gameplay movement, root motion and enemy movement share the same authoritative character bodies.
+- Capsule-style character body, explicit acceleration/braking, air control, capped fall speed, adaptive substeps, iterative penetration solve, slope response, step-up and terrain grounding.
+- Player, root motion and enemy steering share authoritative physics state.
 
-**Critic hold:** needs recorded traversal across slopes/obstacles and input-latency/performance measurements.
+**Hold:** needs traversal stress capture and latency/performance measurements.
 
-### Terrain / world — CANDIDATE
-- Terrain moved back onto Three.js physically based materials so it receives the real lighting/shadow pipeline.
-- Slope/height/macro-noise vertex layering plus tiled micro albedo, bump and roughness breakup.
-- Instanced chunk streamer builds/recycles nearby world sectors and adjusts shadow/detail LOD by distance.
-- Arena ruins remain collidable hero props while streamed dressing expands the surrounding world.
+### Camera — CANDIDATE
+- Spring-damped target-aware shoulder framing.
+- Combat target look blend and dynamic distance.
+- Terrain occlusion sampling and camera impulse.
+- Stronger shoulder/parallax offset after rendered overlap rejection.
 
-**Critic hold:** repetition, pop-in and distant-composition quality must be judged from captures.
+**Hold:** needs fresh five-frame evidence after the latest parallax pass.
 
-### Lighting / rendering / atmosphere — CANDIDATE
-- ACES filmic output, SMAA, tuned bloom and adaptive exposure.
-- 4096² primary soft-shadow map with normal bias, rim/fill light and dynamic contact-shadow decals.
-- Multi-layer camera-relative fog, animated FBM density pockets and low-opacity volumetric light shafts.
+### Character art — REJECTED
+- Current procedural shell has mapped steel/dark/gold armor, cloth, helmet, cuirass, tabard/cape sections, greaves, gauntlets and enemy armor shell.
+- A production `CharacterAssetPipeline` now supports GLTFLoader + Draco + KTX2 + Meshopt, animation aliasing, material/normal-map inspection, triangle/material reporting, required-bone validation and runtime replacement.
 
-**Critic hold:** screenshot comparison is mandatory; brightness, banding, fog sorting and shadow quality cannot be accepted by code inspection.
+**Hard blocker:** the current procedural characters still visibly lose to authored production MMO character assets. This lane cannot become ACCEPTED until a real original rigged GLTF character passes the validator and rendered critic.
 
-### Combat / VFX / enemy AI — CANDIDATE
-- Melee has anticipation, root motion, slash layers, hit-stop, sparks, flash light, impact ring and camera impulse.
-- Rift uses concentric ground waves, vertical beams, transient light and spatial audio.
-- Enemy AI has chase → windup → strike → recovery, world-space danger telegraph, authored attack/hit/death clips and guarded damage reduction.
-- HUD exposes windup state with a cast bar and visual warning.
+### Terrain — CANDIDATE
+- PBR MeshPhysicalMaterial path with slope/height/macro masks.
+- Generated albedo, roughness, bump and true tangent-space normal maps.
+- Darker grass/dirt/rock/moss grade after pale/beige frame rejection.
+- Terrain receives the real Three.js shadow/light pipeline.
 
-**Critic hold:** readability and spectacle need captured combat frames/video.
+**Hold:** needs newest evidence for material breakup and repetition.
+
+### World / environment — CANDIDATE
+- Arena carve-out prevents streamed trees entering the combat core.
+- Ruins rebuilt from beveled irregular ExtrudeGeometry walls, broken columns, arches, slabs and mapped rubble.
+- Near-field detail uses instanced multi-blade grass clumps and pebbles outside the core telegraph zone.
+- Tree trunks include branches; canopies now use alpha-tested leaf-card clusters with negative space instead of solid green rock masses.
+- Streaming predicts player velocity ~0.7s forward and unloads with hysteresis.
+
+**Hold:** latest foliage/architecture pass has not yet passed rendered critic.
+
+### Rendering / lighting / atmosphere — CANDIDATE
+- ACES filmic, SMAA, restrained bloom, adaptive exposure, 2048² PCF soft key shadow, contact-shadow decals, dusk sky, rim/fill setup.
+- Camera-relative multi-layer FBM fog.
+- Geometric fake light shafts removed after visible banding rejection.
+- Adaptive resolution governor tracks rolling frame time and changes pixel ratio within 0.9–1.5.
+- Runtime telemetry records FPS/frame time, resolution scale, draw calls, triangles, lines/points, textures and geometries.
+
+**Hold:** current leaf-card and environment geometry must pass visual + telemetry gate together.
+
+### Combat / VFX — CANDIDATE
+- Sever changed from broad white crescent to narrow Catmull-Rom weapon trail/core.
+- Impact stack: controlled sparks, transient light, compact ring, hit-stop and camera impulse.
+- Rift changed to ground-first rings/rune geometry with restrained vertical accents and light.
+- Enemy telegraph remains world-space and HUD-visible.
+
+**Hold:** fresh combat frames needed after the latest camera/environment changes.
+
+### Enemy AI / authored enemy animation — CANDIDATE
+- Chase → windup → strike → recovery state machine.
+- Preferred-range control, circling/flank-direction changes, retreat when crowded, target-velocity lead and variable heavy/fast attack patterns.
+- Authored attack/hit/death animation clips and world telegraph timing.
+
+**Hold:** no navmesh-level world pathing yet; encounter motion needs new video review.
 
 ### Audio — CANDIDATE
-- WebAudio/Three listener-backed spatial combat mix.
-- Procedural layered whoosh, impact transient/sub hit, rift harmonic rise, ambient noise/drone and adaptive combat/ambience gain.
+- HRTF spatialization and inverse-distance falloff.
+- Master compression + limiting.
+- Combat ducking of ambience/music.
+- Layered impact/weapon/Rift synthesis, ambience/wind layers and convolution reverb send.
+- Occlusion-ready low-pass stage.
 
-**Critic hold:** subjective mix quality requires listening QA; browser autoplay correctly requires user interaction.
+**Hold:** listening QA and world occlusion integration remain required; procedural audio is not yet a final content library.
 
-### UI/HUD — CANDIDATE
-- Target health, resources, cooldowns, enemy state, cast telegraph, world danger disc and warning callout are synchronized to combat state.
-- Responsive layout remains intact.
+### UI / HUD — CANDIDATE
+- Player/target resources, cooldowns, state label, cast/windup bar, world danger telegraph, warning callout and low-health feedback.
+- Responsive layout.
 
-**Critic hold:** ultrawide/mobile/controller/accessibility captures remain outstanding.
+**Hold:** ultrawide/mobile/controller/accessibility captures remain outstanding.
 
-## Automated critic evidence
+### Performance / streaming — CANDIDATE
+- Chunk pooling, instancing, near/mid shadow/detail LOD, predictive preloading and unload hysteresis.
+- Adaptive render-resolution governor and recorded renderer telemetry.
 
-Two GitHub Actions gates are required:
-
-1. `Gauntlet Build Gate`: installs dependencies, builds the production Vite bundle and verifies output artifacts.
-2. `Gauntlet Visual QA`: builds, launches production preview in Chromium, fails on `pageerror`/`console.error`, drives locomotion/melee/Rift/evade inputs, captures five 1920×1080 frames and records WebM gameplay evidence.
-
-`gauntlet-visual-evidence` is the artifact that must be inspected before any visual lane can move from CANDIDATE to ACCEPTED.
+**Hold:** new leaf-card foliage must remain inside a defensible frame/draw-call budget.
 
 ## Current holistic verdict
 
-**NOT ACCEPTED.** The implementation has advanced from systems-exist to integrated-candidate quality, but the Gauntlet still rejects every claim of superiority until successful browser captures are retrieved and judged against current reference footage/screenshots.
+**NOT ACCEPTED.** The branch is materially more advanced and has real build/browser/render evidence, but the current procedural character asset remains an explicit hard rejection and the latest environment/foliage/camera pass is still under visual QA. No blind-comparison victory is claimed.
