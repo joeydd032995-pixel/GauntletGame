@@ -24,9 +24,19 @@ export function createRenderingPipeline(renderer, scene, camera) {
   composer.addPass(renderPass);composer.addPass(bloom);composer.addPass(smaa);composer.addPass(output);
 
   const exposure={target:1.12,value:1.12};
+  let sceneBudgetApplied=false;
+  function applySceneBudget(){
+    if(sceneBudgetApplied)return;sceneBudgetApplied=true;let pointLights=0;
+    scene.traverse(o=>{
+      if(o.isPointLight){pointLights++;if(pointLights>5)o.visible=false;}
+      const mats=Array.isArray(o.material)?o.material:o.material?[o.material]:[];
+      for(const m of mats){if('transmission' in m&&m.transmission>0){m.transmission=0;m.opacity=1;m.transparent=false;m.needsUpdate=true;}}
+    });
+  }
   return {
     composer,bloom,
     update(dt,{combat=0,darkness=.5}={}){
+      applySceneBudget();
       exposure.target=THREE.MathUtils.clamp(1.05+darkness*.2-combat*.035,1.0,1.22);
       exposure.value=THREE.MathUtils.damp(exposure.value,exposure.target,2.4,dt);
       renderer.toneMappingExposure=exposure.value;
