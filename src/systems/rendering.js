@@ -6,6 +6,8 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 export function createRenderingPipeline(renderer, scene, camera) {
+  scene.background=new THREE.Color(0x10242b);
+  if(scene.fog){scene.fog.color.set(0x12262b);if('density' in scene.fog)scene.fog.density=.0052;}
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -34,12 +36,18 @@ export function createRenderingPipeline(renderer, scene, camera) {
   };
 }
 
+function addDuskSky(scene){
+  const material=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,toneMapped:true,vertexShader:`varying vec3 vDir;void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec3 vDir;void main(){float h=clamp(vDir.y*.5+.5,0.,1.);vec3 horizon=vec3(.115,.225,.245);vec3 mid=vec3(.045,.105,.145);vec3 zenith=vec3(.012,.035,.065);vec3 c=mix(horizon,mid,smoothstep(.35,.62,h));c=mix(c,zenith,smoothstep(.58,1.,h));float glow=pow(max(0.,dot(normalize(vDir),normalize(vec3(-.55,.18,.5)))),18.);c+=vec3(.24,.12,.055)*glow*.55;gl_FragColor=vec4(c,1.);}`});
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(250,24,12),material);sky.renderOrder=-1000;scene.add(sky);return sky;
+}
+
 export function configureHeroLightRig(scene){
-  const hemi=new THREE.HemisphereLight(0x9bc9da,0x2c2118,1.45);scene.add(hemi);
+  const sky=addDuskSky(scene);
+  const hemi=new THREE.HemisphereLight(0xa4d2df,0x30251b,1.5);scene.add(hemi);
   const sun=new THREE.DirectionalLight(0xffe4bb,5.8);sun.position.set(-28,38,18);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-42;sun.shadow.camera.right=42;sun.shadow.camera.top=42;sun.shadow.camera.bottom=-42;sun.shadow.camera.near=.5;sun.shadow.camera.far=105;sun.shadow.bias=-.00018;sun.shadow.normalBias=.035;scene.add(sun);
   const rim=new THREE.DirectionalLight(0x82c9ff,2.15);rim.position.set(22,16,-30);scene.add(rim);
   const fill=new THREE.PointLight(0x62a9bd,1.05,28,2);fill.position.set(0,7,5);scene.add(fill);
-  return{hemi,sun,rim,fill};
+  return{sky,hemi,sun,rim,fill};
 }
 
 export function createContactShadow(scene){
