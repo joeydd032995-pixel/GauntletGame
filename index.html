@@ -12,23 +12,15 @@
   <body>
     <div id="app"></div>
     <div id="hud" aria-label="Game HUD">
-      <div class="topbar">
-        <div class="zone">ASHENFALL FRONTIER <span>• DUSK</span></div>
-        <div class="objective"><b>GAUNTLET // I</b><span>Break the Warden's guard</span></div>
-      </div>
+      <div class="topbar"><div class="zone">ASHENFALL FRONTIER <span>• DUSK</span></div><div class="objective"><b>GAUNTLET // I</b><span>Break the Warden's guard</span></div></div>
       <div class="target-card hidden" id="targetCard">
         <div class="target-name">DREAD WARDEN <span>Lv. 8</span></div>
         <div class="bar enemy"><i id="enemyHp"></i></div>
+        <div class="cast-wrap" id="castWrap"><span>CRUSHING DESCENT</span><div class="cast"><i id="enemyCast"></i></div></div>
       </div>
       <div class="reticle" id="reticle"><span></span></div>
-      <div class="player-cluster">
-        <div class="portrait"><div class="portrait-core">V</div><small>8</small></div>
-        <div class="resources">
-          <div class="nameplate"><b>VANGUARD</b><span id="status">READY</span></div>
-          <div class="bar health"><i id="hp"></i><em>100 / 100</em></div>
-          <div class="bar stamina"><i id="stamina"></i><em>100</em></div>
-        </div>
-      </div>
+      <div class="combat-callout" id="combatCallout">BREAK THE WINDUP</div>
+      <div class="player-cluster"><div class="portrait"><div class="portrait-core">V</div><small>8</small></div><div class="resources"><div class="nameplate"><b>VANGUARD</b><span id="status">READY</span></div><div class="bar health"><i id="hp"></i><em id="hpText">100 / 100</em></div><div class="bar stamina"><i id="stamina"></i><em id="staminaText">100</em></div></div></div>
       <div class="actionbar" id="actionbar">
         <button data-key="1"><span class="icon slash"></span><kbd>1</kbd><b>Sever</b><small id="cd1"></small></button>
         <button data-key="2"><span class="icon burst"></span><kbd>2</kbd><b>Rift</b><small id="cd2"></small></button>
@@ -36,7 +28,7 @@
         <button data-key="Space"><span class="icon evade"></span><kbd>SPACE</kbd><b>Evade</b><small id="cd4"></small></button>
       </div>
       <div class="controls"><span>WASD</span> Move <span>SHIFT</span> Sprint <span>RMB</span> Orbit <span>1–3</span> Abilities</div>
-      <div class="vignette"></div>
+      <div class="damage-edge" id="damageEdge"></div><div class="vignette"></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
