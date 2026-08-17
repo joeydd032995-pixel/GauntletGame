@@ -6,12 +6,12 @@ export class WorldStreamer {
   constructor({ scene, camera, heightFn, chunkSize=28, radius=3 }) {
     this.scene=scene;this.camera=camera;this.heightFn=heightFn;this.chunkSize=chunkSize;this.radius=Math.min(radius,2);
     this.chunks=new Map();this.pool=[];this.lastCX=Infinity;this.lastCZ=Infinity;
-    this.trunkMat=new THREE.MeshStandardMaterial({color:0x4a382d,roughness:.93});
-    this.leafMat=new THREE.MeshStandardMaterial({color:0x365a47,roughness:.84});
+    this.trunkMat=new THREE.MeshStandardMaterial({color:0x563d2e,roughness:.91});
+    this.leafMat=new THREE.MeshStandardMaterial({color:0x3f674f,roughness:.82});
     this.rockMat=new THREE.MeshStandardMaterial({color:0x737c79,roughness:.84,metalness:.035});
-    this.treeTrunkGeo=new THREE.CylinderGeometry(.18,.4,4.2,7);
-    this.treeCrownGeo=new THREE.ConeGeometry(1.7,3.6,8);
-    this.rockGeo=new THREE.DodecahedronGeometry(.7,0);
+    this.treeTrunkGeo=new THREE.CylinderGeometry(.16,.38,4.6,10);
+    this.treeCrownGeo=new THREE.IcosahedronGeometry(1.35,2);
+    this.rockGeo=new THREE.DodecahedronGeometry(.68,1);
   }
 
   update(focus) {
@@ -29,9 +29,11 @@ export class WorldStreamer {
     let treeIndex=0,rockIndex=0;
     for(let i=0;i<30;i++){
       const rx=hash2(cx*91+i,cz*73+i*7),rz=hash2(cx*53+i*11,cz*97+i*3),kind=hash2(cx*19+i*5,cz*23+i*13);
-      const lx=(rx-.5)*this.chunkSize,lz=(rz-.5)*this.chunkSize,wx=chunk.group.position.x+lx,wz=chunk.group.position.z+lz,y=this.heightFn(wx,wz);
-      if(kind>.38&&treeIndex<chunk.treeCount){const s=.75+hash2(i,cx+cz)*.75;const m=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+2.1*s,lz),new THREE.Quaternion().setFromEuler(new THREE.Euler(0,hash2(i,cz)*Math.PI*2,0)),new THREE.Vector3(s,s,s));chunk.trunks.setMatrixAt(treeIndex,m);const cm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+4.2*s,lz),new THREE.Quaternion().setFromEuler(new THREE.Euler(0,hash2(i,cx)*Math.PI*2,0)),new THREE.Vector3(s,s,s));chunk.crowns.setMatrixAt(treeIndex,cm);treeIndex++;}
-      else if(rockIndex<chunk.rockCount){const s=.5+hash2(i*2,cx-cz)*1.3;const rm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+.35*s,lz),new THREE.Quaternion().setFromEuler(new THREE.Euler(hash2(i,1),hash2(i,2)*6.28,hash2(i,3))),new THREE.Vector3(s*1.4,s*.8,s));chunk.rocks.setMatrixAt(rockIndex,rm);rockIndex++;}
+      const lx=(rx-.5)*this.chunkSize,lz=(rz-.5)*this.chunkSize,wx=chunk.group.position.x+lx,wz=chunk.group.position.z+lz;
+      if(Math.hypot(wx,wz)<18.5)continue;
+      const y=this.heightFn(wx,wz);
+      if(kind>.38&&treeIndex<chunk.treeCount){const s=.72+hash2(i,cx+cz)*.58,yaw=hash2(i,cz)*Math.PI*2;const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,yaw,0));const m=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+2.3*s,lz),q,new THREE.Vector3(s,s,s));chunk.trunks.setMatrixAt(treeIndex,m);const crownScale=new THREE.Vector3(s*(.9+hash2(i,17)*.15),s*(1.45+hash2(i,29)*.35),s*(.9+hash2(i,31)*.15));const cm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+4.6*s,lz),q,crownScale);chunk.crowns.setMatrixAt(treeIndex,cm);treeIndex++;}
+      else if(rockIndex<chunk.rockCount){const s=.45+hash2(i*2,cx-cz)*1.05;const rm=new THREE.Matrix4().compose(new THREE.Vector3(lx,y+.3*s,lz),new THREE.Quaternion().setFromEuler(new THREE.Euler(hash2(i,1)*.8,hash2(i,2)*6.28,hash2(i,3)*.8)),new THREE.Vector3(s*1.35,s*.72,s));chunk.rocks.setMatrixAt(rockIndex,rm);rockIndex++;}
     }
     chunk.trunks.count=treeIndex;chunk.crowns.count=treeIndex;chunk.rocks.count=rockIndex;chunk.trunks.instanceMatrix.needsUpdate=chunk.crowns.instanceMatrix.needsUpdate=chunk.rocks.instanceMatrix.needsUpdate=true;
     this.scene.add(chunk.group);this.chunks.set(key,chunk);
