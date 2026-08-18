@@ -31,8 +31,11 @@ try{
   await bounded('hide HUD',()=>page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';}));await page.waitForTimeout(350);
 
   async function turntable(subject,action,distance,height,fov){
-    await bounded(`${subject} turntable enter`,()=>page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true}));
-    for(let deg=0;deg<=360;deg+=15){await bounded(`${subject} turntable ${deg}deg`,()=>page.evaluate(d=>window.__GAUNTLET_CAPTURE__.setAngle(d),deg),8_000);await page.waitForTimeout(65);}
+    await bounded(`${subject} turntable enter`,()=>page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true}),30_000);
+    await bounded(`${subject} 360 turntable sweep`,()=>page.evaluate(async()=>{
+      for(let deg=0;deg<=360;deg+=15){window.__GAUNTLET_CAPTURE__.setAngle(deg);await new Promise(resolve=>setTimeout(resolve,85));}
+      return window.__GAUNTLET_CAPTURE__.snapshot();
+    }),60_000);
   }
   await turntable('hero','idle',4.8,1.12,39);await turntable('enemy','enemyIdle',5.25,1.22,41);
 
