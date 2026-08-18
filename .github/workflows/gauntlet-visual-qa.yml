@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: gauntlet-visual-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   visual-qa:
     runs-on: ubuntu-latest
