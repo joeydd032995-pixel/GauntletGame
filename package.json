@@ -12,6 +12,7 @@
     "assets:environment": "node scripts/acquire-authored-environment.mjs",
     "assets:licensed": "npm run assets:mocap && npm run assets:characters && npm run assets:environment",
     "qa:visual": "node qa/capture.mjs",
+    "qa:environment:critic": "node qa/environment-critic.mjs",
     "qa:character": "node qa/reference-character-capture.mjs",
     "qa:character:critic": "node qa/character-critic.mjs",
     "qa:blind": "node qa/blind-compare.mjs"
