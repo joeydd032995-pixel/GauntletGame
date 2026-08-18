@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const PALETTES={
-  oak:{leaf:[0xa6b965,0x748b49,0x405c33],bark:[0x805d42,0x493328]},
-  ash:{leaf:[0x91aa6d,0x607e52,0x365943],bark:[0x8b7862,0x51483d]},
-  pine:{leaf:[0x7d9554,0x4d6d3c,0x2c4b32],bark:[0x755139,0x412e24]}
+  oak:{leaf:[0x7f9855,0x5b783f,0x355238],bark:[0x79573f,0x443027]},
+  ash:{leaf:[0x78925d,0x557649,0x345541],bark:[0x82715e,0x4b4339]},
+  pine:{leaf:[0x70894b,0x48683a,0x29482f],bark:[0x704d37,0x3e2c23]}
 };
 
 function seeded(seed=17){let s=seed||17;return()=>((s=(s*48271)%2147483647)/2147483647);}
@@ -18,9 +18,9 @@ function makeBarkMaterial(palette){
   for(let i=0;i<34;i++){const px=(i*43)%128,w=2+(i%4),y=(i*23)%128;x.fillStyle=colorCss(i%3?palette[1]:palette[0],.48);x.fillRect(px,y,w,18+(i%7)*5);}
   for(let i=0;i<22;i++){x.strokeStyle=colorCss(palette[1],.28);x.lineWidth=1+(i%2);x.beginPath();x.moveTo((i*31)%128,0);x.lineTo(((i*31)+10)%128,128);x.stroke();}
   const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.RepeatWrapping;map.repeat.set(2.5,6.2);map.anisotropy=6;
-  return new THREE.MeshStandardMaterial({map,color:0xffffff,roughness:.96,metalness:0,envMapIntensity:.09});
+  return new THREE.MeshStandardMaterial({map,color:0xffffff,roughness:.96,metalness:0,envMapIntensity:.08});
 }
-function makeCanopyMaterial(palette,{far=false}={}){return new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,flatShading:true,roughness:.93,metalness:0,side:THREE.DoubleSide,envMapIntensity:far?.07:.11,emissive:palette[2],emissiveIntensity:far?.07:.11});}
+function makeCanopyMaterial(palette,{far=false}={}){return new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,flatShading:true,roughness:.94,metalness:0,side:THREE.DoubleSide,envMapIntensity:far?.06:.09,emissive:palette[2],emissiveIntensity:far?.08:.13});}
 
 function addBranch(parts,{length=.9,r0=.11,r1=.045,position=[0,2,0],rotation=[0,0,.7],radial=7}){
   const g=new THREE.CylinderGeometry(r1,r0,length,radial,1,false);g.translate(0,length*.5,0);g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...position),new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation)),new THREE.Vector3(1,1,1)));parts.push(g);
@@ -33,34 +33,33 @@ export function createBranchedTrunkGeometry({height=4.8,baseRadius=.4,topRadius=
   return mergeParts(parts,'Tree trunk');
 }
 
-function makeLobe({position,scale,color,detail=1,twist=0}){const g=new THREE.IcosahedronGeometry(1,detail);g.scale(scale.x,scale.y,scale.z);g.rotateY(twist);g.translate(position.x,position.y,position.z);return tintGeometry(g,color,.93);}
+function makeLobe({position,scale,color,detail=1,twist=0,shade=1}){const g=new THREE.IcosahedronGeometry(1,detail);g.scale(scale.x,scale.y,scale.z);g.rotateY(twist);g.translate(position.x,position.y,position.z);return tintGeometry(g,color,shade);}
 function createLobedCrown({seed=1,shape='broad',far=false,palette=PALETTES.oak.leaf}={}){
-  const rand=seeded(seed),parts=[],count=shape==='broad'?(far?8:17):(far?7:15);
+  const rand=seeded(seed),parts=[],count=shape==='broad'?(far?10:27):(far?9:23);
   for(let i=0;i<count;i++){
-    let x,y,z,sx,sy,sz;
+    let x,y,z,sx,sy,sz,tier;
     if(shape==='broad'){
-      const tier=i<7?0:i<13?1:2,slots=tier===0?7:tier===1?6:4,a=(i+(tier===1?.42:.08))/slots*Math.PI*2+(rand()-.5)*.28,ring=tier===0?1.02:tier===1?.67:.3;
-      x=Math.cos(a)*ring+(rand()-.5)*.18;z=Math.sin(a)*ring+(rand()-.5)*.18;y=-.12+tier*.52+(rand()-.5)*.18;sx=.66+rand()*.26+(tier===0?.08:0);sy=.48+rand()*.18;sz=.64+rand()*.25;
+      tier=i<10?0:i<19?1:2;const slots=tier===0?10:tier===1?9:8,a=(i+(tier===1?.42:.08))/slots*Math.PI*2+(rand()-.5)*.25,ring=tier===0?1.0:tier===1?.66:.3;
+      x=Math.cos(a)*ring+(rand()-.5)*.15;z=Math.sin(a)*ring+(rand()-.5)*.15;y=-.13+tier*.46+(rand()-.5)*.14;sx=.5+rand()*.2+(tier===0?.05:0);sy=.36+rand()*.14;sz=.48+rand()*.2;
     }else{
-      const tier=Math.min(3,Math.floor(i/4)),slots=4,a=(i%4)/slots*Math.PI*2+tier*.48+(rand()-.5)*.25,ring=.55-tier*.07;
-      x=Math.cos(a)*ring+(rand()-.5)*.14;z=Math.sin(a)*ring+(rand()-.5)*.14;y=-.25+tier*.58+(rand()-.5)*.15;sx=.48+rand()*.18;sy=.57+rand()*.23;sz=.46+rand()*.18;
+      tier=Math.min(4,Math.floor(i/5));const slots=5,a=(i%5)/slots*Math.PI*2+tier*.43+(rand()-.5)*.22,ring=.5-tier*.055;
+      x=Math.cos(a)*ring+(rand()-.5)*.11;z=Math.sin(a)*ring+(rand()-.5)*.11;y=-.34+tier*.43+(rand()-.5)*.12;sx=.37+rand()*.14;sy=.46+rand()*.18;sz=.36+rand()*.14;
     }
-    const color=palette[Math.min(palette.length-1,Math.floor(rand()*palette.length))],detail=far?0:1;parts.push(makeLobe({position:new THREE.Vector3(x,y,z),scale:new THREE.Vector3(sx,sy,sz),color,detail,twist:rand()*Math.PI}));
+    const color=palette[(i+tier)%palette.length],detail=far?0:1,shade=.9+tier*.035+rand()*.06;parts.push(makeLobe({position:new THREE.Vector3(x,y,z),scale:new THREE.Vector3(sx,sy,sz),color,detail,twist:rand()*Math.PI,shade}));
   }
   return mergeParts(parts,`${shape} canopy`);
 }
 
-function coniferFan(reach,width,drop,color){
-  const positions=[0,0,0,reach*.28,.025,width,reach*.68,-drop*.35,width*.5,reach,-drop,0,reach*.68,-drop*.35,-width*.5,reach*.28,.025,-width],indices=[0,1,2,0,2,3,0,3,4,0,4,5];
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();return tintGeometry(g,color,.94);
-}
-function createConiferCrown({layers=9,far=false,palette=PALETTES.pine.leaf}={}){
-  const parts=[],whorls=far?4:7;
+function createConiferCrown({layers=10,far=false,palette=PALETTES.pine.leaf}={}){
+  const parts=[],whorls=far?4:6;
   for(let layer=0;layer<layers;layer++){
-    const t=layer/Math.max(1,layers-1),reach=(1.42-t*.86)*(far?.9:1),width=.22+(1-t)*.18,drop=.08+(1-t)*.14,y=.55+layer*.47;
-    for(let b=0;b<whorls;b++){const a=b/whorls*Math.PI*2+(layer%2)*.41,g=coniferFan(reach*(.88+(b%2)*.11),width,drop,palette[(layer+b)%palette.length]);g.rotateY(a);g.translate(Math.cos(a)*.06,y,Math.sin(a)*.06);parts.push(g);}
+    const t=layer/Math.max(1,layers-1),reach=(1.35-t*.82)*(far?.88:1),width=.31+(1-t)*.16,y=.55+layer*.43;
+    for(let b=0;b<whorls;b++){
+      const a=b/whorls*Math.PI*2+(layer%2)*.43,r=reach*.38,scale=new THREE.Vector3(reach*.58,.13+(1-t)*.08,width*(.78+(b%2)*.1)),position=new THREE.Vector3(Math.cos(a)*r,y-(b%2)*.025,Math.sin(a)*r),color=palette[(layer+b)%palette.length];parts.push(makeLobe({position,scale,color,detail:0,twist:-a,shade:.88+t*.09}));
+    }
+    if(!far&&layer%2===0)parts.push(makeLobe({position:new THREE.Vector3(0,y+.02,0),scale:new THREE.Vector3(.34+(1-t)*.12,.16,.34+(1-t)*.12),color:palette[1],detail:0,twist:layer*.3,shade:.92}));
   }
-  for(let b=0;b<5;b++){const a=b/5*Math.PI*2,g=coniferFan(.48,.13,.1,palette[0]);g.rotateY(a);g.rotateZ(-.38);g.translate(0,.55+layers*.47,0);parts.push(g);}
+  parts.push(makeLobe({position:new THREE.Vector3(0,.55+layers*.43+.17,0),scale:new THREE.Vector3(.22,.42,.22),color:palette[0],detail:0,shade:.98}));
   return mergeParts(parts,'Conifer crown');
 }
 
@@ -68,29 +67,29 @@ export function createTreeSpeciesLibrary(){
   return[
     {id:'frontier-oak',trunk:createBranchedTrunkGeometry({height:5.1,baseRadius:.46,topRadius:.16,branchScale:1.13,style:'oak'}),nearCrown:createLobedCrown({seed:31,shape:'broad',palette:PALETTES.oak.leaf}),farCrown:createLobedCrown({seed:31,shape:'broad',far:true,palette:PALETTES.oak.leaf}),trunkMaterial:makeBarkMaterial(PALETTES.oak.bark),nearMaterial:makeCanopyMaterial(PALETTES.oak.leaf),farMaterial:makeCanopyMaterial(PALETTES.oak.leaf,{far:true}),crownY:4.12,baseScale:[.9,1.14]},
     {id:'silver-ash',trunk:createBranchedTrunkGeometry({height:5.8,baseRadius:.32,topRadius:.1,branchScale:.98,style:'ash'}),nearCrown:createLobedCrown({seed:71,shape:'narrow',palette:PALETTES.ash.leaf}),farCrown:createLobedCrown({seed:71,shape:'narrow',far:true,palette:PALETTES.ash.leaf}),trunkMaterial:makeBarkMaterial(PALETTES.ash.bark),nearMaterial:makeCanopyMaterial(PALETTES.ash.leaf),farMaterial:makeCanopyMaterial(PALETTES.ash.leaf,{far:true}),crownY:4.35,baseScale:[.84,1.1]},
-    {id:'ashen-pine',trunk:createBranchedTrunkGeometry({height:6.35,baseRadius:.34,topRadius:.085,branchScale:.28,style:'ash'}),nearCrown:createConiferCrown({layers:10,palette:PALETTES.pine.leaf}),farCrown:createConiferCrown({layers:7,far:true,palette:PALETTES.pine.leaf}),trunkMaterial:makeBarkMaterial(PALETTES.pine.bark),nearMaterial:makeCanopyMaterial(PALETTES.pine.leaf),farMaterial:makeCanopyMaterial(PALETTES.pine.leaf,{far:true}),crownY:.9,baseScale:[.9,1.14]}
+    {id:'ashen-pine',trunk:createBranchedTrunkGeometry({height:6.35,baseRadius:.34,topRadius:.085,branchScale:.25,style:'ash'}),nearCrown:createConiferCrown({layers:11,palette:PALETTES.pine.leaf}),farCrown:createConiferCrown({layers:7,far:true,palette:PALETTES.pine.leaf}),trunkMaterial:makeBarkMaterial(PALETTES.pine.bark),nearMaterial:makeCanopyMaterial(PALETTES.pine.leaf),farMaterial:makeCanopyMaterial(PALETTES.pine.leaf,{far:true}),crownY:.82,baseScale:[.9,1.14]}
   ];
 }
 
 function leafBlade(width,height,{bend=.08}={}){
-  const positions=[0,0,0,-width*.48,height*.38,0,0,height,bend,width*.48,height*.38,0],indices=[0,1,2,0,2,3];const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();return g;
+  const boundary=[[0,0,0],[-width*.34,height*.22,bend*.08],[-width*.53,height*.48,bend*.3],[-width*.3,height*.76,bend*.66],[0,height,bend],[width*.3,height*.76,bend*.66],[width*.53,height*.48,bend*.3],[width*.34,height*.22,bend*.08]],center=[0,height*.49,bend*.34],positions=[...center];for(const p of boundary)positions.push(...p);const indices=[];for(let i=0;i<boundary.length;i++)indices.push(0,1+i,1+((i+1)%boundary.length));const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();return g;
 }
 function placeBlade(g,{angle=0,pitch=-.45,roll=0,x=0,y=0,z=0}){g.rotateX(pitch);g.rotateZ(roll);g.rotateY(angle);g.translate(x,y,z);return g;}
-export function createGrassClumpGeometry({blades=12,height=.5,width=.055}={}){
-  const parts=[];for(let b=0;b<blades;b++){const a=b/blades*Math.PI*2+.17*(b%3),h=height*(.76+(b%5)*.075),w=width*(.74+(b%3)*.16),g=leafBlade(w,h,{bend:.025+(b%2)*.025});placeBlade(g,{angle:a,pitch:-.05+(b%2)*.09,roll:(b%2?1:-1)*.04});parts.push(g);}return mergeParts(parts,'Grass clump');
+export function createGrassClumpGeometry({blades=15,height=.43,width=.034}={}){
+  const parts=[];for(let b=0;b<blades;b++){const a=b/blades*Math.PI*2+.15*(b%3),h=height*(.72+(b%6)*.065),w=width*(.72+(b%3)*.15),g=leafBlade(w,h,{bend:.035+(b%2)*.025});placeBlade(g,{angle:a,pitch:-.08+(b%2)*.1,roll:(b%2?1:-1)*.045});parts.push(g);}return mergeParts(parts,'Grass clump');
 }
 export function createFernGeometry(){
-  const parts=[],fronds=9;for(let f=0;f<fronds;f++){const a=f/fronds*Math.PI*2+(f%2)*.12;for(let j=0;j<5;j++){const t=(j+1)/6,r=.07+t*.3,y=.04+t*.11,w=.095*(1-t*.35),h=.2*(1-t*.18);for(const side of[-1,1]){const g=leafBlade(w,h,{bend:.025});placeBlade(g,{angle:a+side*(.35-.12*t),pitch:-.72+t*.24,roll:side*.22,x:Math.cos(a)*r,y,z:Math.sin(a)*r});parts.push(g);}}const tip=leafBlade(.11,.32,{bend:.04});placeBlade(tip,{angle:a,pitch:-.53,x:Math.cos(a)*.38,y:.19,z:Math.sin(a)*.38});parts.push(tip);}return mergeParts(parts,'Fern');
+  const parts=[],fronds=9;for(let f=0;f<fronds;f++){const a=f/fronds*Math.PI*2+(f%2)*.12;for(let j=0;j<6;j++){const t=(j+1)/7,r=.06+t*.32,y=.035+t*.095,w=.08*(1-t*.3),h=.17*(1-t*.14);for(const side of[-1,1]){const g=leafBlade(w,h,{bend:.032});placeBlade(g,{angle:a+side*(.39-.12*t),pitch:-.76+t*.26,roll:side*.24,x:Math.cos(a)*r,y,z:Math.sin(a)*r});parts.push(g);}}const tip=leafBlade(.095,.31,{bend:.045});placeBlade(tip,{angle:a,pitch:-.54,x:Math.cos(a)*.4,y:.17,z:Math.sin(a)*.4});parts.push(tip);}return mergeParts(parts,'Fern');
 }
 export function createBroadleafGroundGeometry(){
-  const parts=[];for(let i=0;i<9;i++){const a=i/9*Math.PI*2,g=leafBlade(.28+(i%3)*.035,.52+(i%2)*.08,{bend:.055});placeBlade(g,{angle:a,pitch:-.5+(i%2)*.09,roll:(i%2?1:-1)*.07,x:Math.cos(a)*.08,y:.01,z:Math.sin(a)*.08});parts.push(g);}return mergeParts(parts,'Broadleaf ground');
+  const parts=[];for(let i=0;i<10;i++){const a=i/10*Math.PI*2,g=leafBlade(.3+(i%3)*.035,.48+(i%2)*.07,{bend:.065});placeBlade(g,{angle:a,pitch:-.53+(i%2)*.08,roll:(i%2?1:-1)*.075,x:Math.cos(a)*.075,y:.008,z:Math.sin(a)*.075});parts.push(g);}return mergeParts(parts,'Broadleaf ground');
 }
 export function createShrubGeometry(){
-  const parts=[];for(let tier=0;tier<4;tier++){const count=7-tier;for(let i=0;i<count;i++){const a=i/count*Math.PI*2+tier*.47,r=.2-tier*.03,g=leafBlade(.25-tier*.025,.42-tier*.03,{bend:.045});placeBlade(g,{angle:a,pitch:-.36+tier*.055,roll:(i%2?1:-1)*(.1+tier*.015),x:Math.cos(a)*r,y:.08+tier*.13,z:Math.sin(a)*r});parts.push(g);}}return mergeParts(parts,'Shrub');
+  const parts=[];for(let tier=0;tier<4;tier++){const count=8-tier;for(let i=0;i<count;i++){const a=i/count*Math.PI*2+tier*.43,r=.2-tier*.028,g=leafBlade(.31-tier*.025,.34-tier*.018,{bend:.055});placeBlade(g,{angle:a,pitch:-.5+tier*.05,roll:(i%2?1:-1)*(.11+tier*.012),x:Math.cos(a)*r,y:.07+tier*.125,z:Math.sin(a)*r});parts.push(g);}}return mergeParts(parts,'Shrub');
 }
 export function createMossPatchGeometry(){
-  const parts=[],centers=[[0,0,0],[.18,0,.05],[-.16,0,.08],[.08,0,-.16],[-.1,0,-.14],[.03,0,.18]];for(let i=0;i<centers.length;i++){const [x,,z]=centers[i],g=new THREE.SphereGeometry(1,7,4,0,Math.PI*2,0,Math.PI*.5);g.scale(.22+(i%3)*.035,.045+(i%2)*.018,.18+(i%2)*.035);g.translate(x,.004,z);parts.push(g);}return mergeParts(parts,'Moss cushion');
+  const parts=[],centers=[[0,0,0],[.16,0,.04],[-.15,0,.07],[.07,0,-.14],[-.09,0,-.13],[.02,0,.16],[.19,0,-.09]];for(let i=0;i<centers.length;i++){const [x,,z]=centers[i],g=new THREE.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI*.5);g.scale(.18+(i%3)*.03,.052+(i%2)*.018,.15+(i%2)*.03);g.translate(x,.004,z);parts.push(g);}return mergeParts(parts,'Moss cushion');
 }
 export function createFlowerGeometry(){
-  const parts=[new THREE.CylinderGeometry(.013,.018,.31,5)];parts[0].translate(0,.155,0);for(let i=0;i<6;i++){const a=i/6*Math.PI*2,p=new THREE.CircleGeometry(.064,7);p.rotateX(-Math.PI/2);p.translate(Math.cos(a)*.057,.32,Math.sin(a)*.057);parts.push(p);}return mergeParts(parts,'Flower');
+  const parts=[new THREE.CylinderGeometry(.012,.017,.3,5)];parts[0].translate(0,.15,0);for(let i=0;i<6;i++){const a=i/6*Math.PI*2,p=new THREE.CircleGeometry(.061,8);p.rotateX(-Math.PI/2);p.translate(Math.cos(a)*.055,.31,Math.sin(a)*.055);parts.push(p);}return mergeParts(parts,'Flower');
 }
