@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeStoneMaterial, makeCrystalMaterial, makeFoliageMaterial } from './materials.js';
+import { installHybridEnvironment } from './hybridEnvironment.js';
 
 function brokenWallGeometry(){
   const s=new THREE.Shape();s.moveTo(-.72,0);s.lineTo(.7,0);s.lineTo(.67,.86);s.lineTo(.48,1.18);s.lineTo(.18,1.08);s.lineTo(-.08,1.45);s.lineTo(-.36,1.32);s.lineTo(-.7,1.02);s.closePath();
@@ -29,6 +30,7 @@ export function buildRuinArena({scene,physics,heightFn,rng}){
   for(const a of [0,Math.PI]){const r=11.35,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),gate=new THREE.Group();gate.position.set(x,y,z);gate.rotation.y=-a;for(const s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.38,.52,3.5,18,4),stone);p.position.set(s*1.22,1.75,0);p.rotation.z=s*.025;p.castShadow=p.receiveShadow=true;gate.add(p);}const arch=new THREE.Mesh(new THREE.TorusGeometry(1.22,.3,14,42,Math.PI),stone);arch.position.y=3.44;arch.rotation.z=Math.PI;arch.rotation.y=Math.PI/2;arch.castShadow=true;gate.add(arch);root.add(gate);}
   const rune=new THREE.Mesh(new THREE.RingGeometry(2.4,2.47,96),new THREE.MeshBasicMaterial({color:0x52cce8,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));rune.rotation.x=-Math.PI/2;rune.position.set(0,heightFn(0,0)+.035,0);root.add(rune);
   if(!scene.getObjectByName('GroundDetail'))buildGroundDetail({scene,heightFn,rng});
+  installHybridEnvironment({scene,heightFn}).catch(error=>console.error('Hybrid authored environment rejected:',error));
   return root;
 }
 
