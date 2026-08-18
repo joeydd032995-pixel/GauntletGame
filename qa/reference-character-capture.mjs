@@ -3,21 +3,24 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const out='artifacts/character-reference';
-await fs.rm(out,{recursive:true,force:true});await fs.mkdir(out,{recursive:true});
+await fs.rm(out,{recursive:true,force:true});await fs.mkdir(path.join(out,'video'),{recursive:true});
 const browser=await chromium.launch({headless:true});
-const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1});
+const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,recordVideo:{dir:path.join(out,'video'),size:{width:1920,height:1080}}});
 const page=await context.newPage();page.setDefaultTimeout(60000);
 const errors=[];page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
-await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});await page.waitForSelector('canvas',{state:'visible'});await page.waitForFunction(()=>!!window.__GAUNTLET_CAPTURE__);await page.waitForTimeout(1800);
+await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});await page.waitForSelector('canvas',{state:'visible'});await page.waitForFunction(()=>!!window.__GAUNTLET_CAPTURE__);
+await page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status));
+const mocap=await page.evaluate(()=>window.__GAUNTLET_MOCAP__);if(mocap.status!=='ready')throw new Error(`Mocap retarget rejected before capture: ${JSON.stringify(mocap)}`);
+await page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';});await page.waitForTimeout(900);
 
 const shots=[
   ['hero-idle-front',{subject:'hero',action:'idle',view:'front',distance:4.6,height:1.12,fov:38,neutral:true},650],
   ['hero-idle-three-quarter',{subject:'hero',action:'idle',view:'threeQuarter',distance:4.8,height:1.12,fov:39,neutral:true},500],
   ['hero-idle-side',{subject:'hero',action:'idle',view:'side',distance:4.8,height:1.12,fov:39,neutral:true},500],
   ['hero-idle-rear',{subject:'hero',action:'idle',view:'rear',distance:4.8,height:1.12,fov:39,neutral:true},500],
-  ['hero-walk-rear',{subject:'hero',action:'walk',view:'rear',distance:5.4,height:1.3,fov:44},520],
-  ['hero-run-rear',{subject:'hero',action:'run',view:'rear',distance:5.6,height:1.34,fov:45},420],
-  ['hero-sprint-rear',{subject:'hero',action:'sprint',view:'rear',distance:5.8,height:1.38,fov:46},330],
+  ['hero-walk-rear',{subject:'hero',action:'walk',view:'rear',distance:5.4,height:1.3,fov:44},850],
+  ['hero-run-rear',{subject:'hero',action:'run',view:'rear',distance:5.6,height:1.34,fov:45},650],
+  ['hero-sprint-rear',{subject:'hero',action:'sprint',view:'rear',distance:5.8,height:1.38,fov:46},520],
   ['hero-sever-strike',{subject:'hero',action:'attack',view:'threeQuarter',distance:5.0,height:1.22,fov:41},300],
   ['hero-rift-performance',{subject:'hero',action:'rift',view:'threeQuarter',distance:5.2,height:1.22,fov:42},650],
   ['hero-guard',{subject:'hero',action:'guard',view:'threeQuarter',distance:4.9,height:1.18,fov:40},190],
@@ -30,12 +33,13 @@ const shots=[
 const report=[];
 for(const [name,opts,delay] of shots){
   const setup=await page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),opts);await page.waitForTimeout(delay);
-  const metrics=await page.evaluate(()=>({capture:window.__GAUNTLET_CAPTURE__.snapshot(),quality:window.__GAUNTLET_CAPTURE__.quality(),runtime:window.__GAUNTLET_METRICS__||null}));
+  const metrics=await page.evaluate(()=>({capture:window.__GAUNTLET_CAPTURE__.snapshot(),quality:window.__GAUNTLET_CAPTURE__.quality(),runtime:window.__GAUNTLET_METRICS__||null,mocap:window.__GAUNTLET_MOCAP__}));
   const file=path.join(out,`${name}.png`);await page.screenshot({path:file,type:'png'});const stat=await fs.stat(file);report.push({name,file,width:1920,height:1080,bytes:stat.size,setup,metrics});
 }
 await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.exit());
-await fs.writeFile(path.join(out,'capture-report.json'),JSON.stringify({generatedAt:new Date().toISOString(),shots:report,errors},null,2));
+await fs.writeFile(path.join(out,'capture-report.json'),JSON.stringify({generatedAt:new Date().toISOString(),mocap,shots:report,errors},null,2));
 await fs.writeFile(path.join(out,'browser-errors.txt'),errors.length?errors.join('\n'):'No pageerror/console.error detected.\n');
-await browser.close();
+await page.close();await context.close();await browser.close();
+const videos=(await fs.readdir(path.join(out,'video'))).filter(f=>f.endsWith('.webm'));if(!videos.length)throw new Error('Character motion evidence rejected: no 1080p WebM produced');
 if(errors.length)throw new Error(`Character reference capture rejected:\n${errors.join('\n')}`);
-console.log(`Character reference capture: PASS (${report.length} frames)`);
+console.log(`Character reference capture: PASS (${report.length} frames, ${videos.length} motion video)`);
