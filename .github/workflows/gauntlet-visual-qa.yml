@@ -29,6 +29,8 @@ jobs:
         run: npx --yes wait-on http://127.0.0.1:4173 --timeout 30000
       - name: Capture gameplay
         run: npm run qa:visual
+      - name: Harsh hybrid environment critic
+        run: npm run qa:environment:critic
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4
