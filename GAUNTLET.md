@@ -1,124 +1,121 @@
-# GAUNTLET Quality Protocol
+# GAUNTLET — Refined OSRS / 07Scape Quality Protocol
 
-No system is marked AAA-complete from code inspection alone. No World of Warcraft / Old School RuneScape superiority claim is permitted without rendered evidence. Every system moves through **REJECTED → PLAYABLE → CANDIDATE → ACCEPTED**.
+The previous “beat modern World of Warcraft” target is permanently retired.
+
+The only active visual target is **high-end Old School RuneScape / 07Scape**: a refined stylized experience that preserves OSRS readability, charm, silhouette discipline and combat clarity while materially improving authored asset quality, animation weight, terrain grounding, environmental richness and presentation polish.
+
+No system is accepted from code inspection alone. Every major visual lane moves through **REJECTED → PLAYABLE → CANDIDATE → ACCEPTED** and requires rendered evidence. Structural CI success is never visual approval.
+
+## Non-negotiable art direction
+
+**Target shorthand:** refined OSRS → stronger silhouettes → richer authored environments → restrained stylized materials → readable combat poses → dense but intentional scenery.
+
+Do not drift toward:
+- modern WoW material language
+- photorealism
+- bloom-heavy cinematic fantasy
+- procedural complexity as a substitute for authored design
+- generic low-poly asset-pack presentation
 
 ## Evidence gates
 
-- **Gauntlet Build Gate** — production Vite build + bundle verification.
-- **Gauntlet Visual QA** — production preview in Chromium, scripted locomotion/melee/Rift/evade sequence, WebM recording, five required 1920×1080 extracted frames, browser error capture, and render telemetry.
-- Visual QA now runs on every `sol/**` push and pull-request update.
-- A missing/empty evidence frame fails the gate.
+- **Gauntlet Build Gate** — licensed/pinned asset acquisition + production Vite build + bundle verification.
+- **Gauntlet Visual QA** — production Chromium preview, scripted idle/locomotion/melee/Rift/evade sequence, 1080p WebM, five required rendered frames, browser-error capture and render telemetry.
+- **Gauntlet Character QA** — 15 required 2560×1440 character shots, hero/enemy turntables, authored-source telemetry, motion video, clip-map audit and structural critic.
+- Missing assets, missing frames, browser/runtime errors, duplicate evidence, invalid motion coverage or visible procedural character geometry fail their relevant gate.
+- Hybrid environment evidence is not captured until `__GAUNTLET_HYBRID_ENVIRONMENT__.ready === true`.
 
-## Rendered critic history
+## Specialist / critic protocol
 
-### Early black-frame rejection
-The first real Chromium artifact showed the HUD over an almost black 3D scene. Cause: double-dark terrain modulation combined with an excessive headless render budget (4096² shadow, 49 chunks, 18 atmosphere layers, 16 point lights, transmission). **REJECTED.**
+Work is organized into explicit specialist and harsh-critic lanes:
+1. Character Asset
+2. Animation & Motion
+3. Environment & Hybrid Dressing
+4. Terrain & Ground Material
+5. Lighting, Atmosphere & Polish
+6. UI/HUD & Overall Presentation
 
-### Run 9 rejection
-Usable video showed combat obstructed by streamed vegetation, primitive character art, and melee/Rift effects becoming broad overexposed wedges. **REJECTED.** Arena carve-out, VFX hierarchy and render budgets were rebuilt.
-
-### Run 14 rejection
-The runtime passed end-to-end, but screenshots showed a rigid cape card, floating-looking enemy lower body, box-ring ruins and visibly primitive characters. **REJECTED.** Enemy IK naming, cloth segmentation, materials and arena geometry were rebuilt.
-
-### Run 19 / 23 rejection
-Mapped PBR materials and character shells improved technical response, but rendered characters still read as procedural mannequins and player/target composition lacked separation. **REJECTED.** Target-aware shoulder camera, armor shell, authored-material pipeline and VFX signatures were rebuilt.
-
-### Run 29 / 37 rejection
-Frames exposed stick-like grass, rock-mass foliage, repeated generated ruins, fake geometric light-shaft bands, weak parallax and incomplete fifth-frame evidence. **REJECTED.** Light shafts were removed, ruins moved to irregular extruded architecture, grass to multi-blade clumps, foliage to leaf-card clusters, camera parallax increased, and evidence extraction now uses the actual video tail for the final frame.
+A specialist lane may implement changes but cannot declare acceptance. A harsh critic must inspect real screenshots/motion and compare against OSRS/07Scape readability, density, weight and presentation before any lane can become ACCEPTED.
 
 ## Current specialist state
 
-### Animation / motion matching / root motion / IK — CANDIDATE
-- AnimationMixer state graph with forced combat states.
-- Motion matcher scores speed, acceleration, angular speed, direction, grounded state and combat context with transition hysteresis.
-- Root motion extracted from animated hips and consumed by gameplay attacks/evades.
-- Bind-pose-relative foot IK with terrain-normal ankle alignment, shin compensation and hip lowering.
-- Enemy leg naming standardized so the same terrain-aware solver reaches both feet.
+### Character Asset — REJECTED
 
-**Hold:** motion/video review is still required for foot sliding, turn quality and combat weight.
+The old lofted/extruded visible character presentation has been replaced at runtime by authored skinned GLB presentation. Legacy procedural meshes are hidden only after authored installation succeeds.
 
-### Physics / controller — CANDIDATE
-- Capsule-style character body, explicit acceleration/braking, air control, capped fall speed, adaptive substeps, iterative penetration solve, slope response, step-up and terrain grounding.
-- Player, root motion and enemy steering share authoritative physics state.
+The current CI-safe KayKit Knight/Barbarian tier is intentionally marked **scaffold-only**. It proves loading, rigging, animation and capture infrastructure, but its chunky generic low-poly look failed the visual critic and is ineligible for final approval.
 
-**Hold:** needs traversal stress capture and latency/performance measurements.
+The production ingest tier now targets the CC0 Quaternius ecosystem:
+- Universal Base Characters
+- Modular Character Outfits — Fantasy
+- Universal Animation Library
 
-### Camera — CANDIDATE
-- Spring-damped target-aware shoulder framing.
-- Combat target look blend and dynamic distance.
-- Terrain occlusion sampling and camera impulse.
-- Stronger shoulder/parallax offset after rendered overlap rejection.
+`scripts/acquire-authored-characters.mjs` supports `GAUNTLET_QUATERNIUS_MANIFEST` for deterministic ingestion of locally acquired/composed production GLBs and compatible animation GLBs. The generated `public/assets/authored/character-source.json` records the active source tier and whether it is eligible for final visual review.
 
-**Hold:** needs fresh five-frame evidence after the latest parallax pass.
+**Hard blocker:** Vanguard and Dread Warden must be installed from the production tier and then pass QHD/gameplay-camera visual review. Scaffold visuals cannot be accepted.
 
-### Character art — REJECTED
-- Current procedural shell has mapped steel/dark/gold armor, cloth, helmet, cuirass, tabard/cape sections, greaves, gauntlets and enemy armor shell.
-- A production `CharacterAssetPipeline` now supports GLTFLoader + Draco + KTX2 + Meshopt, animation aliasing, material/normal-map inspection, triangle/material reporting, required-bone validation and runtime replacement.
+### Animation & Motion — CANDIDATE / NOT VISUALLY APPROVED
 
-**Hard blocker:** the current procedural characters still visibly lose to authored production MMO character assets. This lane cannot become ACCEPTED until a real original rigged GLTF character passes the validator and rendered critic.
+- Gameplay AnimationGraph, forced combat states, root motion, motion matching and terrain-aware foot IK remain intact.
+- Authored presentation now maps visible clips by semantic state.
+- Runtime can ingest compatible external animation GLBs from the active character-source profile.
+- Character QA requires locomotion, combat, reaction and death mappings plus distinct clip diversity.
 
-### Terrain — CANDIDATE
-- PBR MeshPhysicalMaterial path with slope/height/macro masks.
-- Generated albedo, roughness, bump and true tangent-space normal maps.
-- Darker grass/dirt/rock/moss grade after pale/beige frame rejection.
-- Terrain receives the real Three.js shadow/light pipeline.
+**Hold:** production-tier visible motion still needs real evidence for weight, anticipation, strike timing, recovery, planted feet and OSRS-like snappy readability.
 
-**Hold:** needs newest evidence for material breakup and repetition.
+### Environment & Hybrid Dressing — CANDIDATE / NOT VISUALLY APPROVED
 
-### World / environment — CANDIDATE
-- Arena carve-out prevents streamed trees entering the combat core.
-- Ruins rebuilt from beveled irregular ExtrudeGeometry walls, broken columns, arches, slabs and mapped rubble.
-- Near-field detail uses instanced multi-blade grass clumps and pebbles outside the core telegraph zone.
-- Tree trunks include branches; canopies now use alpha-tested leaf-card clusters with negative space instead of solid green rock masses.
-- Streaming predicts player velocity ~0.7s forward and unloads with hysteresis.
+The arena is transitioning from procedural/instanced-only dressing toward a hybrid model:
+- authored CC0 hero props are pinned and acquired with provenance
+- deterministic foreground/midground authored placements are loaded through `hybridEnvironment.js`
+- background instancing remains for scalable density
+- readiness/mesh/triangle/instance telemetry is exposed through `__GAUNTLET_HYBRID_ENVIRONMENT__`
 
-**Hold:** latest foliage/architecture pass has not yet passed rendered critic.
+Current authored baseline includes curated dungeon pillars, stacked crates and decorated barrels. These are not accepted merely because they load.
 
-### Rendering / lighting / atmosphere — CANDIDATE
-- ACES filmic, SMAA, restrained bloom, adaptive exposure, 2048² PCF soft key shadow, contact-shadow decals, dusk sky, rim/fill setup.
-- Camera-relative multi-layer FBM fog.
-- Geometric fake light shafts removed after visible banding rejection.
-- Adaptive resolution governor tracks rolling frame time and changes pixel ratio within 0.9–1.5.
-- Runtime telemetry records FPS/frame time, resolution scale, draw calls, triangles, lines/points, textures and geometries.
+**Hold:** fresh captures must prove that authored hero pieces materially break repetition, create hierarchy and remove the “efficient but empty web demo” read.
 
-**Hold:** current leaf-card and environment geometry must pass visual + telemetry gate together.
+### Terrain & Ground Material — CANDIDATE
 
-### Combat / VFX — CANDIDATE
-- Sever changed from broad white crescent to narrow Catmull-Rom weapon trail/core.
-- Impact stack: controlled sparks, transient light, compact ring, hit-stop and camera impulse.
-- Rift changed to ground-first rings/rune geometry with restrained vertical accents and light.
-- Enemy telegraph remains world-space and HUD-visible.
+Existing layered terrain and ground detail remain functional, but the new target requires more deliberate grass/dirt/stone zoning, edge variation, contact grounding and readable combat-space composition.
 
-**Hold:** fresh combat frames needed after the latest camera/environment changes.
+**Hold:** terrain remains below final refined-OSRS acceptance until the authored environment composition is visually established.
 
-### Enemy AI / authored enemy animation — CANDIDATE
-- Chase → windup → strike → recovery state machine.
-- Preferred-range control, circling/flank-direction changes, retreat when crowded, target-velocity lead and variable heavy/fast attack patterns.
-- Authored attack/hit/death animation clips and world telegraph timing.
+### Lighting, Atmosphere & Polish — CANDIDATE
 
-**Hold:** no navmesh-level world pathing yet; encounter motion needs new video review.
+Existing ACES/render pipeline, shadows, atmosphere and restrained post-processing remain operational.
 
-### Audio — CANDIDATE
-- HRTF spatialization and inverse-distance falloff.
-- Master compression + limiting.
-- Combat ducking of ambience/music.
-- Layered impact/weapon/Rift synthesis, ambience/wind layers and convolution reverb send.
-- Occlusion-ready low-pass stage.
+**Direction:** remove the previous cyan/magenta cinematic-demo bias; favor clear stylized warm/cool separation, readable silhouettes, restrained emissive/bloom and atmospheric depth without fog soup.
 
-**Hold:** listening QA and world occlusion integration remain required; procedural audio is not yet a final content library.
+### UI/HUD & Overall Presentation — CANDIDATE
 
-### UI / HUD — CANDIDATE
-- Player/target resources, cooldowns, state label, cast/windup bar, world danger telegraph, warning callout and low-health feedback.
-- Responsive layout.
+The current HUD is functional but not final. It must become more crafted and in-universe while preserving immediate combat readability. Do not copy Jagex art assets.
 
-**Hold:** ultrawide/mobile/controller/accessibility captures remain outstanding.
+## CI history after OSRS reset
 
-### Performance / streaming — CANDIDATE
-- Chunk pooling, instancing, near/mid shadow/detail LOD, predictive preloading and unload hysteresis.
-- Adaptive render-resolution governor and recorded renderer telemetry.
+- Authored-character CI initially failed before build because the pinned KayKit revision was invalid. The revision was corrected and binary-size/GLB validation was added.
+- Build and Visual QA subsequently progressed successfully through the authored runtime.
+- Character capture was hardened with stage-level watchdogs and guaranteed cleanup so a stalled screenshot/turntable/video finalization produces deterministic rejection instead of consuming the workflow timeout.
+- Visual QA now waits for authored hybrid-environment readiness before accepting evidence.
 
-**Hold:** new leaf-card foliage must remain inside a defensible frame/draw-call budget.
+## Acceptance rules
+
+A high-end OSRS/07Scape claim requires all of the following:
+- production-tier authored Vanguard and Warden assets
+- production-tier visible authored/retargeted animation coverage
+- zero visible procedural character meshes
+- strong silhouettes at gameplay camera distance
+- authored foreground/midground environmental identity plus intentional background density
+- terrain and props visibly grounded
+- restrained stylized materials and lighting
+- readable combat poses and effects
+- HUD clarity that fits the world
+- fresh screenshots and motion reviewed by the harsh critic
+
+Passing structural tests is necessary but insufficient.
 
 ## Current holistic verdict
 
-**NOT ACCEPTED.** The branch is materially more advanced and has real build/browser/render evidence, but the current procedural character asset remains an explicit hard rejection and the latest environment/foliage/camera pass is still under visual QA. No blind-comparison victory is claimed.
+**REJECTED — NOT READY TO MERGE.**
+
+The infrastructure has crossed from procedural prototype toward a production-capable authored pipeline, but the visible character tier remains a rejected scaffold and the hybrid environment has not yet earned visual approval. No claim that Gauntlet matches or beats high-quality OSRS/07Scape is permitted until fresh production-tier captures support it.
