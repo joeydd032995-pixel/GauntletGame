@@ -22,14 +22,20 @@ try{
   const canvasMs=Date.now()-navStart;
   await page.waitForFunction(()=>window.__GAUNTLET_METRICS__?.renderer?.calls>0,null,{timeout:60000});
   const firstRenderedMs=Date.now()-navStart;
-  await page.waitForFunction(()=>{const s=window.__GAUNTLET_HYBRID_ENVIRONMENT__;if(s?.error)throw new Error(`hybrid environment: ${s.error}`);return s?.ready===true;},null,{timeout:60000});
+  await page.waitForFunction(()=>{const s=window.__GAUNTLET_AUTHORED_CHARACTERS__;return s?.ready===true||!!s?.error||!!s?.hero?.error||!!s?.enemy?.error;},null,{timeout:90000});
+  const authoredReadyMs=Date.now()-navStart;
+  const authored=await page.evaluate(()=>JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)));
+  if(!authored?.ready||authored.error||!authored.hero?.installed||!authored.enemy?.installed)throw new Error(`authored character presentation rejected before visual capture: ${JSON.stringify(authored)}`);
+  await page.waitForFunction(()=>{const s=window.__GAUNTLET_HYBRID_ENVIRONMENT__;return s?.ready===true||!!s?.error;},null,{timeout:60000});
   const environmentReadyMs=Date.now()-navStart;
-  boot=await page.evaluate(({domMs,canvasMs,firstRenderedMs,environmentReadyMs})=>({domMs,canvasMs,firstRenderedMs,environmentReadyMs,mocap:window.__GAUNTLET_MOCAP__||null,hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null,metrics:window.__GAUNTLET_METRICS__||null}),{domMs,canvasMs,firstRenderedMs,environmentReadyMs});
+  const hybridEnvironment=await page.evaluate(()=>JSON.parse(JSON.stringify(window.__GAUNTLET_HYBRID_ENVIRONMENT__||null)));
+  if(!hybridEnvironment?.ready||hybridEnvironment.error)throw new Error(`hybrid environment rejected before visual capture: ${JSON.stringify(hybridEnvironment)}`);
+  boot=await page.evaluate(({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,authored,hybridEnvironment})=>({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,authored,hybridEnvironment,mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}),{domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,authored,hybridEnvironment});
   await page.waitForTimeout(900);mark('01-idle-1080p.png');
   await page.mouse.click(960,540);await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('02-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
   await page.keyboard.press('1');await page.waitForTimeout(140);mark('03-melee-impact-1080p.png');await page.waitForTimeout(480);
   await page.keyboard.press('2');await page.waitForTimeout(110);mark('04-rift-vfx-1080p.png');await page.waitForTimeout(650);
-  await page.keyboard.press('Space');await page.waitForTimeout(140);mark('05-evade-1080p.png');await page.waitForTimeout(2200);metrics=await page.evaluate(()=>({runtime:window.__GAUNTLET_METRICS__||null,hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null}));
+  await page.keyboard.press('Space');await page.waitForTimeout(140);mark('05-evade-1080p.png');await page.waitForTimeout(2200);metrics=await page.evaluate(()=>({runtime:window.__GAUNTLET_METRICS__||null,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null}));
 }catch(e){fatal=e;errors.push(`capture: ${e.stack||e.message}`);}finally{await context.close().catch(()=>{});await browser.close().catch(()=>{});}
 
 async function findFfmpeg(){try{await exec('ffmpeg',['-version'],{timeout:3000});return'ffmpeg';}catch{}const root=path.join(os.homedir(),'.cache','ms-playwright');try{for(const dir of await fs.readdir(root)){if(!dir.startsWith('ffmpeg-'))continue;for(const name of['ffmpeg-linux','ffmpeg']){const candidate=path.join(root,dir,name);try{await fs.access(candidate);return candidate;}catch{}}}}catch{}throw new Error('Playwright FFmpeg binary not found');}
