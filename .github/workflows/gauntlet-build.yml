@@ -22,11 +22,19 @@ jobs:
       - name: Acquire pinned licensed assets
         run: npm run assets:licensed
       - run: npm run build
-      - name: Verify production bundle and authored characters
+      - name: Verify production bundle and authored asset tier
         run: |
           test -f dist/index.html
           test -d dist/assets
           find dist/assets -type f | grep -q .
-          test -f dist/assets/authored/kaykit-adventurers/Knight.glb
-          test -f dist/assets/authored/kaykit-adventurers/Barbarian.glb
-          test -f dist/assets/authored/kaykit-adventurers/provenance.json
+          test -f dist/assets/authored/character-source.json
+          test -f dist/assets/authored/quaternius-base/VanguardBase.glb
+          test -f dist/assets/authored/quaternius-base/WardenBase.glb
+          test -f dist/assets/authored/quaternius-base/UAL1.glb
+          test -f dist/assets/authored/quaternius-base/UAL-Combat-Extension.glb
+          test -f dist/assets/authored/quaternius-base/provenance.json
+          test -f dist/assets/authored/kaykit-dungeon/pillar_decorated.obj
+          test -f dist/assets/authored/kaykit-dungeon/crates_stacked.obj
+          test -f dist/assets/authored/kaykit-dungeon/barrel_large_decorated.obj
+          test -f dist/assets/authored/kaykit-dungeon/provenance.json
+          node -e "const p=require('./dist/assets/authored/character-source.json'); if(p.tier!=='quaternius-base-intermediate'&&p.tier!=='production-quaternius') process.exit(1); if(!p.actors?.hero?.url||!p.actors?.enemy?.url) process.exit(1);"
