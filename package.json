@@ -10,6 +10,7 @@
     "assets:mocap": "node scripts/acquire-mocap.mjs",
     "qa:visual": "node qa/capture.mjs",
     "qa:character": "node qa/reference-character-capture.mjs",
+    "qa:character:critic": "node qa/character-critic.mjs",
     "qa:blind": "node qa/blind-compare.mjs"
   },
   "dependencies": {
