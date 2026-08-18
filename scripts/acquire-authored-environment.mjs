@@ -10,7 +10,7 @@ const assets=[
   {file:'crates_stacked.obj',role:'authored supply cluster'},
   {file:'barrel_large_decorated.obj',role:'authored decorated barrel'},
   {file:'wall_broken.obj',role:'authored broken ruin wall'},
-  {file:'wall_arched.obj',role:'authored arched landmark wall'},
+  {file:'wall_doorway.obj',role:'authored doorway landmark wall'},
   {file:'stairs_wide.obj',role:'authored broad stone stairs'}
 ];
 const texture={file:'dungeon_texture.png',role:'authored dungeon atlas'};
