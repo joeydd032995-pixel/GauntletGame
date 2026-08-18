@@ -22,17 +22,25 @@ jobs:
       - name: Acquire pinned licensed assets
         run: npm run assets:licensed
       - run: npm run build
-      - name: Verify production bundle and authored asset tier
+      - name: Verify production bundle and dressed authored asset tier
         run: |
           test -f dist/index.html
           test -d dist/assets
           find dist/assets -type f | grep -q .
           test -f dist/assets/authored/character-source.json
-          test -f dist/assets/authored/quaternius-base/VanguardBase.glb
-          test -f dist/assets/authored/quaternius-base/WardenBase.glb
-          test -f dist/assets/authored/quaternius-base/UAL1.glb
-          test -f dist/assets/authored/quaternius-base/UAL-Combat-Extension.glb
-          test -f dist/assets/authored/quaternius-base/provenance.json
+          test -f dist/assets/authored/quaternius-dressed/Male_Ranger.gltf
+          test -f dist/assets/authored/quaternius-dressed/Male_Ranger.bin
+          test -f dist/assets/authored/quaternius-dressed/Female_Ranger.gltf
+          test -f dist/assets/authored/quaternius-dressed/Female_Ranger.bin
+          test -f dist/assets/authored/quaternius-dressed/T_Ranger_BaseColor.png
+          test -f dist/assets/authored/quaternius-dressed/T_Regular_Male_Dark_BaseColor.png
+          test -f dist/assets/authored/quaternius-dressed/T_Regular_Female_Dark_BaseColor.png
+          test -f dist/assets/authored/quaternius-dressed/UAL1.glb
+          test -f dist/assets/authored/quaternius-dressed/UAL-Combat-Extension.glb
+          test -f dist/assets/authored/quaternius-dressed/VanguardSword.glb
+          test -f dist/assets/authored/quaternius-dressed/WardenHelmet.glb
+          test -f dist/assets/authored/quaternius-dressed/WardenClub.glb
+          test -f dist/assets/authored/quaternius-dressed/provenance.json
           test -f dist/assets/authored/kaykit-dungeon/pillar_decorated.obj
           test -f dist/assets/authored/kaykit-dungeon/crates_stacked.obj
           test -f dist/assets/authored/kaykit-dungeon/barrel_large_decorated.obj
@@ -41,4 +49,4 @@ jobs:
           test -f dist/assets/authored/kaykit-dungeon/stairs_wide.obj
           test -f dist/assets/authored/kaykit-dungeon/dungeon_texture.png
           test -f dist/assets/authored/kaykit-dungeon/provenance.json
-          node -e "const p=require('./dist/assets/authored/character-source.json'); if(p.tier!=='quaternius-base-intermediate'&&p.tier!=='production-quaternius') process.exit(1); if(!p.actors?.hero?.url||!p.actors?.enemy?.url) process.exit(1);"
+          node -e "const p=require('./dist/assets/authored/character-source.json'); if(p.tier!=='quaternius-dressed-intermediate'&&p.tier!=='production-quaternius') process.exit(1); if(p.clothingComplete!==true) process.exit(1); if(!p.actors?.hero?.url||!p.actors?.enemy?.url) process.exit(1); if(p.actors.hero.clothingComplete!==true||p.actors.enemy.clothingComplete!==true) process.exit(1); if((p.actors.hero.equipment?.length||0)<1||(p.actors.enemy.equipment?.length||0)<2) process.exit(1); if(p.actors.hero.silhouetteClass===p.actors.enemy.silhouetteClass) process.exit(1);"
