@@ -9,11 +9,11 @@ const context=await browser.newContext({viewport:{width:BOOT_W,height:BOOT_H},de
 const page=await context.newPage();page.setDefaultTimeout(60000);
 const errors=[];page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
 const navStart=Date.now();await page.goto('http://127.0.0.1:4173',{waitUntil:'domcontentloaded',timeout:20000});const domMs=Date.now()-navStart;
-await page.waitForFunction(()=>document.querySelector('canvas')&&window.__GAUNTLET_CAPTURE__,{timeout:60000});const canvasMs=Date.now()-navStart;
-await page.waitForFunction(()=>window.__GAUNTLET_METRICS__?.renderer?.calls>0,{timeout:60000});const firstRenderedMs=Date.now()-navStart;
-await page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status),{timeout:30000});
+await page.waitForFunction(()=>!!document.querySelector('canvas')&&!!window.__GAUNTLET_CAPTURE__,null,{timeout:60000});const canvasMs=Date.now()-navStart;
+await page.waitForFunction(()=>window.__GAUNTLET_METRICS__?.renderer?.calls>0,null,{timeout:60000});const firstRenderedMs=Date.now()-navStart;
+await page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status),null,{timeout:30000});
 const mocap=await page.evaluate(()=>window.__GAUNTLET_MOCAP__);if(mocap.status!=='ready')throw new Error(`Mocap retarget rejected before capture: ${JSON.stringify(mocap)}`);
-await page.setViewportSize({width:W,height:H});await page.waitForFunction(()=>document.querySelector('canvas')?.width>=W&&document.querySelector('canvas')?.height>=H,{timeout:30000});await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
+await page.setViewportSize({width:W,height:H});await page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:W,h:H},{timeout:30000});await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
 const boot={bootResolution:[BOOT_W,BOOT_H],stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null};
 await page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';});await page.waitForTimeout(350);
 async function turntable(subject,action,distance,height,fov){await page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true});for(let deg=0;deg<=360;deg+=15){await page.evaluate(d=>window.__GAUNTLET_CAPTURE__.setAngle(d),deg);await page.waitForTimeout(65);}}
