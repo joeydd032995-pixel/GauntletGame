@@ -25,6 +25,8 @@ jobs:
         run: npx --yes wait-on http://127.0.0.1:4173 --timeout 30000
       - name: Capture character evidence
         run: npm run qa:character
+      - name: Harsh character critic
+        run: npm run qa:character:critic
       - name: Upload character evidence
         if: always()
         uses: actions/upload-artifact@v4
