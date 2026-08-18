@@ -2,16 +2,22 @@ import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const out='artifacts/character-reference';
+const out='artifacts/character-reference',WIDTH=2560,HEIGHT=1440;
 await fs.rm(out,{recursive:true,force:true});await fs.mkdir(path.join(out,'video'),{recursive:true});
 const browser=await chromium.launch({headless:true});
-const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,recordVideo:{dir:path.join(out,'video'),size:{width:1920,height:1080}}});
+const context=await browser.newContext({viewport:{width:WIDTH,height:HEIGHT},deviceScaleFactor:1,recordVideo:{dir:path.join(out,'video'),size:{width:1920,height:1080}}});
 const page=await context.newPage();page.setDefaultTimeout(60000);
 const errors=[];page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
 await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});await page.waitForSelector('canvas',{state:'visible'});await page.waitForFunction(()=>!!window.__GAUNTLET_CAPTURE__);
 await page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status));
 const mocap=await page.evaluate(()=>window.__GAUNTLET_MOCAP__);if(mocap.status!=='ready')throw new Error(`Mocap retarget rejected before capture: ${JSON.stringify(mocap)}`);
 await page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';});await page.waitForTimeout(900);
+
+async function turntable(subject,action,distance,height,fov){
+  await page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true});
+  for(let deg=0;deg<=360;deg+=15){await page.evaluate(d=>window.__GAUNTLET_CAPTURE__.setAngle(d),deg);await page.waitForTimeout(70);}
+}
+await turntable('hero','idle',4.8,1.12,39);await turntable('enemy','enemyIdle',5.25,1.22,41);
 
 const shots=[
   ['hero-idle-front',{subject:'hero',action:'idle',view:'front',distance:4.6,height:1.12,fov:38,neutral:true},650],
@@ -34,12 +40,12 @@ const report=[];
 for(const [name,opts,delay] of shots){
   const setup=await page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),opts);await page.waitForTimeout(delay);
   const metrics=await page.evaluate(()=>({capture:window.__GAUNTLET_CAPTURE__.snapshot(),quality:window.__GAUNTLET_CAPTURE__.quality(),runtime:window.__GAUNTLET_METRICS__||null,mocap:window.__GAUNTLET_MOCAP__}));
-  const file=path.join(out,`${name}.png`);await page.screenshot({path:file,type:'png'});const stat=await fs.stat(file);report.push({name,file,width:1920,height:1080,bytes:stat.size,setup,metrics});
+  const file=path.join(out,`${name}.png`);await page.screenshot({path:file,type:'png'});const stat=await fs.stat(file);report.push({name,file,width:WIDTH,height:HEIGHT,bytes:stat.size,setup,metrics});
 }
 await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.exit());
-await fs.writeFile(path.join(out,'capture-report.json'),JSON.stringify({generatedAt:new Date().toISOString(),mocap,shots:report,errors},null,2));
+await fs.writeFile(path.join(out,'capture-report.json'),JSON.stringify({generatedAt:new Date().toISOString(),mocap,stillResolution:[WIDTH,HEIGHT],motionResolution:[1920,1080],turntables:['hero','enemy'],shots:report,errors},null,2));
 await fs.writeFile(path.join(out,'browser-errors.txt'),errors.length?errors.join('\n'):'No pageerror/console.error detected.\n');
 await page.close();await context.close();await browser.close();
 const videos=(await fs.readdir(path.join(out,'video'))).filter(f=>f.endsWith('.webm'));if(!videos.length)throw new Error('Character motion evidence rejected: no 1080p WebM produced');
 if(errors.length)throw new Error(`Character reference capture rejected:\n${errors.join('\n')}`);
-console.log(`Character reference capture: PASS (${report.length} frames, ${videos.length} motion video)`);
+console.log(`Character reference capture: PASS (${report.length} QHD frames, turntables, ${videos.length} motion video)`);
