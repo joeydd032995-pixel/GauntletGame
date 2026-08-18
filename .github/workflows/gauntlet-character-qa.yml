@@ -1,7 +1,7 @@
 name: Gauntlet Character QA
 on:
   push:
-    branches: ['sol/character-gauntlet']
+    branches: ['sol/osrs-art-reset']
   pull_request:
     branches: [main]
 
@@ -19,17 +19,17 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Acquire licensed mocap sources
-        run: npm run assets:mocap
+      - name: Acquire pinned licensed assets
+        run: npm run assets:licensed
       - run: npm run build
       - run: npx playwright install chromium
       - name: Start production preview
         run: npm run preview -- --port 4173 > /tmp/gauntlet-preview.log 2>&1 &
       - name: Wait for runtime
         run: npx --yes wait-on http://127.0.0.1:4173 --timeout 30000
-      - name: Capture character evidence
+      - name: Capture authored character evidence
         run: npm run qa:character
-      - name: Harsh character critic
+      - name: Harsh OSRS character critic
         run: npm run qa:character:critic
       - name: Upload character evidence
         if: always()
