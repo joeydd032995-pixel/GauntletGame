@@ -19,6 +19,14 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
+      - name: Acquire pinned licensed assets
+        run: npm run assets:licensed
       - run: npm run build
-      - name: Verify production bundle
-        run: test -f dist/index.html && test -d dist/assets && find dist/assets -type f | grep -q .
+      - name: Verify production bundle and authored characters
+        run: |
+          test -f dist/index.html
+          test -d dist/assets
+          find dist/assets -type f | grep -q .
+          test -f dist/assets/authored/kaykit-adventurers/Knight.glb
+          test -f dist/assets/authored/kaykit-adventurers/Barbarian.glb
+          test -f dist/assets/authored/kaykit-adventurers/provenance.json
