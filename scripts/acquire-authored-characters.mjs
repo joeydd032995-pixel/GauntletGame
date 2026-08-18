@@ -32,7 +32,7 @@ async function installQuaternius(manifestPath){
 }
 
 async function installPinnedQuaterniusBase(){
-  const BODY_REPO='rom-orlovich/prompt-fighter',BODY_REV='20095a9e8af3da5d69afca422c433201e12263511d'.replace('53b91b0fa3da5d69afca422c433201e12263511d','20095a9e8af3a32406508cfbdd3e93130de2c143');
+  const BODY_REPO='rom-orlovich/prompt-fighter',BODY_REV='20095a9e8af3a32406508cfbdd3e93130de2c143';
   const UAL_REPO='Seyamalam/blood-league-kickoff',UAL_REV='aa02a4e6d8337a0604d2da131bcbbeb1f01badf0';
   const ualCore=['Idle_Loop','Walk_Loop','Jog_Fwd_Loop','Sprint_Loop','Punch_Cross','Spell_Simple_Shoot','Hit_Chest','Death01','Roll','Sword_Attack'];
   const ualCombat=['Idle_Shield_Loop','Melee_Hook','Hit_Knockback','Slide_Start'];
