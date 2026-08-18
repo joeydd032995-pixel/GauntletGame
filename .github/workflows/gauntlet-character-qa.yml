@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: gauntlet-character-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   character-qa:
     runs-on: ubuntu-latest
