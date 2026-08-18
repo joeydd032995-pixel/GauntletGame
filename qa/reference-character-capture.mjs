@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const out='artifacts/character-reference',BOOT_W=1920,BOOT_H=1080,W=2560,H=1440;
+const out='artifacts/character-reference',BOOT_W=1920,BOOT_H=1080,TURN_W=1280,TURN_H=720,W=2560,H=1440;
 const STAGE_MS=20_000,SHOT_MS=25_000,CLOSE_MS=15_000;
 const started=Date.now();
 const log=(message)=>console.log(`[character-capture +${((Date.now()-started)/1000).toFixed(1)}s] ${message}`);
@@ -25,19 +25,26 @@ try{
   if(!authored?.ready||authored.error||authored.hero?.error||authored.enemy?.error||!authored.hero?.installed||!authored.enemy?.installed)throw new Error(`Authored character presentation rejected before capture: ${JSON.stringify(authored)}`);
   await bounded('wait mocap state',()=>page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status),null,{timeout:30000}),35_000);
   const mocap=await bounded('read mocap telemetry',()=>page.evaluate(()=>window.__GAUNTLET_MOCAP__));if(mocap.status!=='ready')throw new Error(`Mocap retarget rejected before capture: ${JSON.stringify(mocap)}`);
-  await bounded('set QHD viewport',()=>page.setViewportSize({width:W,height:H}));
-  await bounded('wait QHD canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:W,h:H},{timeout:30000}),35_000);await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
-  const boot={bootResolution:[BOOT_W,BOOT_H],stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null,authored};
-  await bounded('hide HUD',()=>page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';}));await page.waitForTimeout(350);
+  await bounded('hide HUD',()=>page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';}));
+  await bounded('set turntable viewport',()=>page.setViewportSize({width:TURN_W,height:TURN_H}));
+  await bounded('wait turntable canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:TURN_W,h:TURN_H},{timeout:30000}),35_000);await page.waitForTimeout(250);
 
   async function turntable(subject,action,distance,height,fov){
     await bounded(`${subject} turntable enter`,()=>page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true}),30_000);
     await bounded(`${subject} 360 turntable sweep`,()=>page.evaluate(async()=>{
-      for(let deg=0;deg<=360;deg+=15){window.__GAUNTLET_CAPTURE__.setAngle(deg);await new Promise(resolve=>setTimeout(resolve,85));}
+      const steps=16;
+      for(let i=0;i<=steps;i++){
+        window.__GAUNTLET_CAPTURE__.setAngle(i/steps*360);
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      }
       return window.__GAUNTLET_CAPTURE__.snapshot();
-    }),60_000);
+    }),45_000);
   }
   await turntable('hero','idle',4.8,1.12,39);await turntable('enemy','enemyIdle',5.25,1.22,41);
+
+  await bounded('set QHD viewport',()=>page.setViewportSize({width:W,height:H}));
+  await bounded('wait QHD canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:W,h:H},{timeout:30000}),35_000);await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
+  const boot={bootResolution:[BOOT_W,BOOT_H],turntableResolution:[TURN_W,TURN_H],turntableSteps:16,stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null,authored};
 
   const shots=[
     ['hero-idle-front',{subject:'hero',action:'idle',view:'front',distance:4.6,height:1.12,fov:38,neutral:true},650],['hero-idle-three-quarter',{subject:'hero',action:'idle',view:'threeQuarter',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-idle-side',{subject:'hero',action:'idle',view:'side',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-idle-rear',{subject:'hero',action:'idle',view:'rear',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-walk-rear',{subject:'hero',action:'walk',view:'rear',distance:5.4,height:1.3,fov:44},850],['hero-run-rear',{subject:'hero',action:'run',view:'rear',distance:5.6,height:1.34,fov:45},650],['hero-sprint-rear',{subject:'hero',action:'sprint',view:'rear',distance:5.8,height:1.38,fov:46},520],['hero-sever-strike',{subject:'hero',action:'attack',view:'threeQuarter',distance:5.0,height:1.22,fov:41},300],['hero-rift-performance',{subject:'hero',action:'rift',view:'threeQuarter',distance:5.2,height:1.22,fov:42},650],['hero-guard',{subject:'hero',action:'guard',view:'threeQuarter',distance:4.9,height:1.18,fov:40},190],['hero-parry',{subject:'hero',action:'parry',view:'threeQuarter',distance:4.9,height:1.18,fov:40},180],['hero-evade',{subject:'hero',action:'dodge',view:'side',distance:5.4,height:1.24,fov:43},310],['warden-idle-three-quarter',{subject:'enemy',action:'enemyIdle',view:'threeQuarter',distance:5.3,height:1.25,fov:41,neutral:true},600],['warden-attack',{subject:'enemy',action:'enemyAttack',view:'threeQuarter',distance:5.5,height:1.25,fov:42},520],['warden-heavy',{subject:'enemy',action:'enemyHeavy',view:'threeQuarter',distance:5.5,height:1.25,fov:42},710]
@@ -63,4 +70,4 @@ const videos=(await fs.readdir(path.join(out,'video')).catch(()=>[])).filter(f=>
 if(captureError)throw captureError;
 if(!videos.length)throw new Error('Character motion evidence rejected: no 1080p WebM produced');
 if(errors.length)throw new Error(`Character reference capture rejected:\n${errors.join('\n')}`);
-console.log(`Authored character reference capture: PASS (15 QHD frames, ${videos.length} motion video; bounded deterministic runner)`);
+console.log(`Authored character reference capture: PASS (15 QHD frames, ${videos.length} motion video; 720p turntable phase + QHD still phase)`);
