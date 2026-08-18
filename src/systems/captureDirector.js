@@ -7,18 +7,21 @@ export class CharacterCaptureDirector{
   constructor({camera,hero,enemy,heroAnim,enemyAnim,heightFn}){
     this.camera=camera;this.hero=hero;this.enemy=enemy;this.heroAnim=heroAnim;this.enemyAnim=enemyAnim;this.heightFn=heightFn;
     this.active=false;this.subject='hero';this.action='idle';this.angle=0;this.distance=5.2;this.height=1.25;this.fov=42;this.neutral=false;this.sequenceId=0;
+    this.turntable={active:false,duration:0,startedAt:0,startAngle:0,completed:false};
     this.tmp=new THREE.Vector3();this.look=new THREE.Vector3();
   }
-  enter({subject='hero',action='idle',view='front',angle=null,distance=5.2,height=1.25,fov=42,neutral=false}={}){
+  enter({subject='hero',action='idle',view='front',angle=null,distance=5.2,height=1.25,fov=42,neutral=false,turntableSeconds=0}={}){
     this.active=true;this.subject=subject;this.action=action;this.angle=angle??VIEW_ANGLES[view]??0;this.distance=distance;this.height=height;this.fov=fov;this.neutral=neutral;this.sequenceId++;
+    if(turntableSeconds>0){this.turntable.active=true;this.turntable.duration=Math.max(1,turntableSeconds);this.turntable.startedAt=performance.now();this.turntable.startAngle=this.angle;this.turntable.completed=false;}else{this.turntable.active=false;this.turntable.completed=false;}
     this.#trigger();return this.snapshot();
   }
-  exit(){this.active=false;this.camera.fov=54;this.camera.updateProjectionMatrix();}
-  setAngle(degrees){this.angle=THREE.MathUtils.degToRad(degrees);return this.snapshot();}
+  exit(){this.active=false;this.turntable.active=false;this.camera.fov=54;this.camera.updateProjectionMatrix();}
+  setAngle(degrees){this.turntable.active=false;this.angle=THREE.MathUtils.degToRad(degrees);return this.snapshot();}
   setAction(action){this.action=action;this.sequenceId++;this.#trigger();return this.snapshot();}
   setSubject(subject){this.subject=subject;this.sequenceId++;this.#trigger();return this.snapshot();}
   update(dt){
     if(!this.active)return false;
+    if(this.turntable.active){const elapsed=(performance.now()-this.turntable.startedAt)/1000,progress=Math.min(1,elapsed/this.turntable.duration);this.angle=this.turntable.startAngle+progress*Math.PI*2;if(progress>=1){this.turntable.active=false;this.turntable.completed=true;}}
     const subject=this.subject==='enemy'?this.enemy:this.hero,anim=this.subject==='enemy'?this.enemyAnim:this.heroAnim;
     const speed=this.subject==='hero'?(ACTION_SPEED[this.action]??0):(this.action==='enemyWalk'?2.8:0);
     anim.setLocomotion({speed,angularSpeed:0,grounded:true,combat:this.action!=='idle'&&this.action!=='walk',direction:0,dt});
@@ -27,7 +30,7 @@ export class CharacterCaptureDirector{
     this.camera.position.set(center.x+Math.sin(this.angle)*horizontal,center.y+this.height,center.z+Math.cos(this.angle)*horizontal);
     this.camera.fov=this.fov;this.camera.updateProjectionMatrix();this.camera.lookAt(center);return true;
   }
-  snapshot(){const anim=this.subject==='enemy'?this.enemyAnim:this.heroAnim;return{active:this.active,subject:this.subject,action:this.action,angleDegrees:+THREE.MathUtils.radToDeg(this.angle).toFixed(1),distance:this.distance,height:this.height,fov:this.fov,neutral:this.neutral,sequenceId:this.sequenceId,animation:anim.getTelemetry()};}
+  snapshot(){const anim=this.subject==='enemy'?this.enemyAnim:this.heroAnim;return{active:this.active,subject:this.subject,action:this.action,angleDegrees:+THREE.MathUtils.radToDeg(this.angle).toFixed(1),distance:this.distance,height:this.height,fov:this.fov,neutral:this.neutral,sequenceId:this.sequenceId,turntable:{active:this.turntable.active,duration:this.turntable.duration,completed:this.turntable.completed},animation:anim.getTelemetry()};}
   #trigger(){const anim=this.subject==='enemy'?this.enemyAnim:this.heroAnim,a=this.action;if(a==='idle'||a==='walk'||a==='run'||a==='sprint'||a==='enemyIdle'||a==='enemyWalk')return;anim.trigger(a,{fade:.025,loop:false});}
 }
 
