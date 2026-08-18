@@ -19,8 +19,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Acquire licensed mocap sources
-        run: npm run assets:mocap
+      - name: Acquire pinned licensed assets
+        run: npm run assets:licensed
       - run: npm run build
       - run: npx playwright install chromium
       - name: Start production preview
