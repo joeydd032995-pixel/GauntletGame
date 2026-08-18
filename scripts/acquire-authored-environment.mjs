@@ -13,6 +13,7 @@ const assets=[
   {file:'wall_arched.obj',role:'authored arched landmark wall'},
   {file:'stairs_wide.obj',role:'authored broad stone stairs'}
 ];
+const texture={file:'dungeon_texture.png',role:'authored dungeon atlas'};
 const outDir=path.resolve('public/assets/authored/kaykit-dungeon');
 await mkdir(outDir,{recursive:true});
 const provenance={source:'KayKit Dungeon Remastered',repository:REPO,revision:REV,license:'CC0 1.0',purpose:'Authored hero environment modules for Gauntlet refined-OSRS hybrid dressing',files:{}};
@@ -26,6 +27,17 @@ for(const asset of assets){
   const sha256=createHash('sha256').update(bytes).digest('hex');
   await writeFile(path.join(outDir,asset.file),bytes);
   provenance.files[asset.file]={role:asset.role,url,bytes:bytes.length,sha256};
+}
+{
+  const url=`${ROOT}/${texture.file}`;
+  const response=await fetch(url,{redirect:'follow'});
+  if(!response.ok)throw new Error(`Authored environment texture fetch failed ${response.status}: ${url}`);
+  const bytes=Buffer.from(await response.arrayBuffer());
+  const pngMagic=bytes.subarray(0,8).toString('hex');
+  if(bytes.length<4096||pngMagic!=='89504e470d0a1a0a')throw new Error(`Invalid or suspicious PNG: ${texture.file} (${bytes.length} bytes, magic=${pngMagic})`);
+  const sha256=createHash('sha256').update(bytes).digest('hex');
+  await writeFile(path.join(outDir,texture.file),bytes);
+  provenance.files[texture.file]={role:texture.role,url,bytes:bytes.length,sha256};
 }
 await writeFile(path.join(outDir,'provenance.json'),JSON.stringify(provenance,null,2));
 console.log(`Authored CC0 environment ready: ${Object.entries(provenance.files).map(([k,v])=>`${k} ${v.bytes}B ${v.sha256.slice(0,12)}`).join(', ')}`);
