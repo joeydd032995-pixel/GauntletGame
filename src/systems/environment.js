@@ -1,15 +1,30 @@
 import * as THREE from 'three';
-import { makeStoneMaterial, makeCrystalMaterial, makeFoliageMaterial } from './materials.js';
+import { makeStoneMaterial, makeCrystalMaterial } from './materials.js';
 import { installHybridEnvironment } from './hybridEnvironment.js';
-import { createGrassClumpGeometry, createFernGeometry, createBroadleafGroundGeometry, createFlowerGeometry } from './foliage.js';
+import { createGrassClumpGeometry, createFernGeometry, createBroadleafGroundGeometry, createFlowerGeometry, createTreeSpeciesLibrary } from './foliage.js';
 
 function brokenWallGeometry(){
   const s=new THREE.Shape();s.moveTo(-.72,0);s.lineTo(.7,0);s.lineTo(.67,.86);s.lineTo(.48,1.18);s.lineTo(.18,1.08);s.lineTo(-.08,1.45);s.lineTo(-.36,1.32);s.lineTo(-.7,1.02);s.closePath();
   const g=new THREE.ExtrudeGeometry(s,{depth:.48,steps:1,bevelEnabled:true,bevelSegments:2,bevelSize:.055,bevelThickness:.055,curveSegments:3});g.translate(0,0,-.24);g.computeVertexNormals();return g;
 }
-function combatLane(x,z){const r=Math.hypot(x,z);return r<4.45||(Math.abs(x)<2.05&&z>-14&&z<14);}
+function combatLane(x,z){const r=Math.hypot(x,z);return r<4.25||(Math.abs(x)<1.65&&z>-13.5&&z<13.5);}
 function clusteredPoint(rng,index,spread=2.6){const centers=[[-8.8,-5.5],[8.5,-5.8],[-10.4,3.8],[10.6,4.1],[-6.3,10.2],[6.7,10.6],[-13.2,-.5],[13.1,.4],[-4.8,-12.1],[5.2,-12.3]],c=centers[index%centers.length],a=rng()*Math.PI*2,r=Math.sqrt(rng())*spread;return[c[0]+Math.cos(a)*r,c[1]+Math.sin(a)*r];}
 function configureInstances(mesh,count){mesh.count=count;mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.frustumCulled=true;mesh.receiveShadow=true;return mesh;}
+function plantMaterial(){return new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide,emissive:0x13200d,emissiveIntensity:.16});}
+
+function buildHeroTreeGrove({scene,heightFn}){
+  const root=new THREE.Group();root.name='HeroTreeGrove';scene.add(root);const kits=createTreeSpeciesLibrary(),placements=[
+    [-15.5,-9.5,0,1.14],[-11.8,-14.2,2,1.03],[-6.6,-16.4,1,.96],[6.9,-16.2,2,1.03],[12.1,-13.9,0,1.08],[15.7,-9.1,1,.98],
+    [-17.1,-2.6,1,1.02],[17.0,-2.1,2,1.08],[-16.1,6.1,0,1.12],[16.4,6.3,0,1.04],[-12.2,12.0,2,1.06],[-6.3,15.2,0,.98],[6.5,15.0,1,1.02],[12.4,11.8,2,1.08]
+  ];
+  const bySpecies=kits.map(()=>[]);for(const p of placements)bySpecies[p[2]].push(p);
+  for(let si=0;si<kits.length;si++){
+    const kit=kits[si],list=bySpecies[si],trunks=new THREE.InstancedMesh(kit.trunk,kit.trunkMaterial,list.length),crowns=new THREE.InstancedMesh(kit.nearCrown,kit.nearMaterial,list.length);trunks.castShadow=trunks.receiveShadow=true;crowns.castShadow=crowns.receiveShadow=true;
+    list.forEach(([x,z,_species,scale],i)=>{const y=heightFn(x,z),yaw=(i*.91+si*1.17)%6.283,q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,yaw,0)),s=scale*(.96+(i%3)*.035);trunks.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),q,new THREE.Vector3(s,s,s)));crowns.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(x,y+kit.crownY*s,z),q,new THREE.Vector3(s*(.96+(i%2)*.08),s,s*(.96+(i%2)*.08))));});
+    trunks.instanceMatrix.needsUpdate=crowns.instanceMatrix.needsUpdate=true;root.add(trunks,crowns);
+  }
+  if(typeof window!=='undefined')window.__GAUNTLET_HERO_TREES__={target:'high-end OSRS/07Scape',ready:true,count:placements.length,species:kits.map(k=>k.id),placement:'hand-composed arena perimeter'};return placements.length;
+}
 
 export function buildRuinArena({scene,physics,heightFn,rng}){
   const root=new THREE.Group();root.name='RuinArena';scene.add(root);const stone=makeStoneMaterial(),wallGeo=brokenWallGeometry(),columnGeo=new THREE.CylinderGeometry(.48,.64,1,18,5),slabGeo=new THREE.BoxGeometry(1,1,1,4,1,4),rubbleGeo=new THREE.DodecahedronGeometry(.35,1);
@@ -22,25 +37,20 @@ export function buildRuinArena({scene,physics,heightFn,rng}){
   for(let i=0;i<16;i++){const a=i/16*Math.PI*2,r=7.55+(i%2)*.34,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),slab=new THREE.Mesh(slabGeo,stone);slab.scale.set(1.45,.1,.72);slab.position.set(x,y+.02,z);slab.rotation.set((rng()-.5)*.02,-a+(rng()-.5)*.1,(rng()-.5)*.018);slab.receiveShadow=true;root.add(slab);}
   for(const a of[0,Math.PI]){const r=11.35,x=Math.cos(a)*r,z=Math.sin(a)*r,y=heightFn(x,z),gate=new THREE.Group();gate.position.set(x,y,z);gate.rotation.y=-a;for(const s of[-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.38,.52,3.5,18,4),stone);p.position.set(s*1.22,1.75,0);p.rotation.z=s*.025;p.castShadow=p.receiveShadow=true;gate.add(p);}const arch=new THREE.Mesh(new THREE.TorusGeometry(1.22,.3,14,42,Math.PI),stone);arch.position.y=3.44;arch.rotation.z=Math.PI;arch.rotation.y=Math.PI/2;arch.castShadow=true;gate.add(arch);root.add(gate);}
   const rune=new THREE.Mesh(new THREE.RingGeometry(2.4,2.47,96),new THREE.MeshBasicMaterial({color:0x52cce8,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));rune.rotation.x=-Math.PI/2;rune.position.set(0,heightFn(0,0)+.035,0);root.add(rune);
-  if(!scene.getObjectByName('GroundDetail'))buildGroundDetail({scene,heightFn,rng});
-  installHybridEnvironment({scene,heightFn}).catch(error=>console.error('Hybrid authored environment rejected:',error));
-  return root;
+  const heroTreeCount=buildHeroTreeGrove({scene,heightFn});if(!scene.getObjectByName('GroundDetail'))buildGroundDetail({scene,heightFn,rng,heroTreeCount});installHybridEnvironment({scene,heightFn}).catch(error=>console.error('Hybrid authored environment rejected:',error));return root;
 }
 
-export function buildGroundDetail({scene,heightFn,rng}){
-  const root=new THREE.Group();root.name='GroundDetail';scene.add(root);
-  const foliage=makeFoliageMaterial();foliage.side=THREE.DoubleSide;foliage.roughness=.9;const grassGeo=createGrassClumpGeometry({blades:9,height:.5,width:.052}),fernGeo=createFernGeometry(),broadGeo=createBroadleafGroundGeometry(),flowerGeo=createFlowerGeometry();
-  const grass=new THREE.InstancedMesh(grassGeo,foliage,560),ferns=new THREE.InstancedMesh(fernGeo,foliage.clone(),150),broadleaf=new THREE.InstancedMesh(broadGeo,foliage.clone(),130),flowerMat=new THREE.MeshStandardMaterial({color:0xe7dca6,roughness:.82,metalness:0,side:THREE.DoubleSide}),flowers=new THREE.InstancedMesh(flowerGeo,flowerMat,96);
-  const palettes={grass:[0x68834a,0x55743f,0x7b8d50],fern:[0x496d43,0x355b39,0x5b7546],broad:[0x5d7942,0x436535,0x789054],flower:[0xe7dca6,0xd7c36b,0xc7d8ef,0xbccfa8]};
-  function fill(mesh,target,kind,spread,scaleMin,scaleMax){let n=0,tries=0;while(n<target&&tries<target*6){const[x,z]=clusteredPoint(rng,tries+(kind==='fern'?2:kind==='flower'?5:kind==='broad'?7:0),spread),r=Math.hypot(x,z);tries++;if(r>18.8||combatLane(x,z))continue;const y=heightFn(x,z),s=scaleMin+rng()*(scaleMax-scaleMin),tilt=(rng()-.5)*.07,q=new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt,rng()*Math.PI*2,-tilt*.7));mesh.setMatrixAt(n,new THREE.Matrix4().compose(new THREE.Vector3(x,y+.012,z),q,new THREE.Vector3(s,s*(.92+rng()*.16),s)));const palette=palettes[kind],c=new THREE.Color(palette[Math.floor(rng()*palette.length)]);mesh.setColorAt(n,c);n++;}configureInstances(mesh,n);return n;}
-  const counts={grass:fill(grass,520,'grass',3.25,.62,1.28),fern:fill(ferns,132,'fern',2.7,.72,1.25),broadleaf:fill(broadleaf,118,'broad',2.45,.7,1.18),flowers:fill(flowers,84,'flower',2.2,.68,1.16)};
-  grass.castShadow=false;ferns.castShadow=false;broadleaf.castShadow=false;flowers.castShadow=false;root.add(grass,ferns,broadleaf,flowers);
-  const pebbleGeo=new THREE.DodecahedronGeometry(.12,1),pebbles=new THREE.InstancedMesh(pebbleGeo,makeStoneMaterial(),190);let pi=0;for(let i=0;i<280&&pi<180;i++){const a=rng()*Math.PI*2,r=4.2+rng()*14.1,x=Math.cos(a)*r,z=Math.sin(a)*r;if(combatLane(x,z)&&rng()>.24)continue;const y=heightFn(x,z),s=.42+rng()*1.2;pebbles.setMatrixAt(pi++,new THREE.Matrix4().compose(new THREE.Vector3(x,y+.045*s,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rng(),rng()*6.28,rng())),new THREE.Vector3(s*1.25,s*.55,s)));}configureInstances(pebbles,pi);pebbles.castShadow=false;root.add(pebbles);counts.pebbles=pi;
-  const status={target:'high-end OSRS/07Scape',ready:true,accepted:false,placement:'clustered-authored-density',combatLaneClear:true,clusters:10,counts,totalPlants:counts.grass+counts.fern+counts.broadleaf+counts.flowers,note:'Structural density only; screenshot critic controls visual acceptance.'};if(typeof window!=='undefined')window.__GAUNTLET_GROUND_DETAIL__=status;return root;
+export function buildGroundDetail({scene,heightFn,rng,heroTreeCount=0}){
+  const root=new THREE.Group();root.name='GroundDetail';scene.add(root);const grassGeo=createGrassClumpGeometry({blades:10,height:.52,width:.055}),fernGeo=createFernGeometry(),broadGeo=createBroadleafGroundGeometry(),flowerGeo=createFlowerGeometry();
+  const grass=new THREE.InstancedMesh(grassGeo,plantMaterial(),610),ferns=new THREE.InstancedMesh(fernGeo,plantMaterial(),180),broadleaf=new THREE.InstancedMesh(broadGeo,plantMaterial(),155),flowerMat=new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide,emissive:0x241d0a,emissiveIntensity:.16}),flowers=new THREE.InstancedMesh(flowerGeo,flowerMat,118);
+  const palettes={grass:[0x78944c,0x5f813f,0x8ca058],fern:[0x557a46,0x3f673b,0x6b8751],broad:[0x6c8949,0x4f713b,0x88a15b],flower:[0xf0dc8c,0xe2bf61,0xc5d9ee,0xd9c0e7,0xc7d79d]};
+  function fill(mesh,target,kind,spread,scaleMin,scaleMax){let n=0,tries=0;while(n<target&&tries<target*7){const[x,z]=clusteredPoint(rng,tries+(kind==='fern'?2:kind==='flower'?5:kind==='broad'?7:0),spread),r=Math.hypot(x,z);tries++;if(r>18.5||combatLane(x,z))continue;const y=heightFn(x,z),s=scaleMin+rng()*(scaleMax-scaleMin),tilt=(rng()-.5)*.055,q=new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt,rng()*Math.PI*2,-tilt*.7));mesh.setMatrixAt(n,new THREE.Matrix4().compose(new THREE.Vector3(x,y+.014,z),q,new THREE.Vector3(s,s*(.94+rng()*.12),s)));mesh.setColorAt(n,new THREE.Color(palettes[kind][Math.floor(rng()*palettes[kind].length)]));n++;}configureInstances(mesh,n);return n;}
+  const counts={grass:fill(grass,580,'grass',3.35,.66,1.36),fern:fill(ferns,158,'fern',2.85,.78,1.3),broadleaf:fill(broadleaf,138,'broad',2.62,.75,1.24),flowers:fill(flowers,104,'flower',2.35,.7,1.2)};grass.castShadow=ferns.castShadow=broadleaf.castShadow=flowers.castShadow=false;root.add(grass,ferns,broadleaf,flowers);
+  const pebbleGeo=new THREE.DodecahedronGeometry(.12,1),pebbles=new THREE.InstancedMesh(pebbleGeo,new THREE.MeshStandardMaterial({color:0x726957,roughness:.95,metalness:0}),190);let pi=0;for(let i=0;i<300&&pi<180;i++){const a=rng()*Math.PI*2,r=4.1+rng()*14.1,x=Math.cos(a)*r,z=Math.sin(a)*r;if(combatLane(x,z)&&rng()>.28)continue;const y=heightFn(x,z),s=.42+rng()*1.2;pebbles.setMatrixAt(pi++,new THREE.Matrix4().compose(new THREE.Vector3(x,y+.045*s,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rng(),rng()*6.28,rng())),new THREE.Vector3(s*1.25,s*.55,s)));}configureInstances(pebbles,pi);root.add(pebbles);counts.pebbles=pi;
+  const pathStoneGeo=new THREE.DodecahedronGeometry(.18,0),pathStoneMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.96,metalness:0}),pathStones=new THREE.InstancedMesh(pathStoneGeo,pathStoneMat,280);let si=0;for(let i=0;i<320&&si<260;i++){const z=-15+rng()*30,meander=Math.sin(z*.055)*1.05+Math.sin(z*.018+1.7)*.62,x=meander+(rng()-.5)*3.3;if(Math.hypot(x,z)<3.8&&rng()>.58)continue;const y=heightFn(x,z),s=.68+rng()*.95,q=new THREE.Quaternion().setFromEuler(new THREE.Euler((rng()-.5)*.16,rng()*6.28,(rng()-.5)*.13));pathStones.setMatrixAt(si,new THREE.Matrix4().compose(new THREE.Vector3(x,y+.035,z),q,new THREE.Vector3(s*1.5,s*.28,s)));pathStones.setColorAt(si,new THREE.Color([0x807966,0x6d695d,0x8a806b,0x665f50][i%4]));si++;}configureInstances(pathStones,si);pathStones.castShadow=false;root.add(pathStones);counts.pathStones=si;
+  const status={target:'high-end OSRS/07Scape',ready:true,accepted:false,placement:'clustered-authored-density',combatLaneClear:true,clusters:10,counts,totalPlants:counts.grass+counts.fern+counts.broadleaf+counts.flowers,heroTrees:heroTreeCount,pathStones:si,note:'Structural density only; screenshot critic controls visual acceptance.'};if(typeof window!=='undefined')window.__GAUNTLET_GROUND_DETAIL__=status;return root;
 }
 
 export function buildCrystalField({scene,heightFn,rng}){
-  const root=new THREE.Group();root.name='CrystalField';scene.add(root);const material=makeCrystalMaterial(),geo=new THREE.OctahedronGeometry(.28,2);
-  for(let i=0;i<12;i++){const a=rng()*Math.PI*2,r=17+rng()*30,x=Math.cos(a)*r,z=Math.sin(a)*r,s=.75+rng()*.65,c=new THREE.Mesh(geo,material);c.scale.set(s*.62,s*(2.4+rng()*1.9),s*.62);c.position.set(x,heightFn(x,z)+.48*s,z);c.rotation.set((rng()-.5)*.14,rng()*6.28,(rng()-.5)*.22);c.castShadow=true;root.add(c);if(i<4){const l=new THREE.PointLight(0x4acff2,.72,7,2);l.position.copy(c.position).add(new THREE.Vector3(0,.8,0));root.add(l);}}
-  return root;
+  const root=new THREE.Group();root.name='CrystalField';scene.add(root);const material=makeCrystalMaterial(),geo=new THREE.OctahedronGeometry(.28,2);for(let i=0;i<12;i++){const a=rng()*Math.PI*2,r=17+rng()*30,x=Math.cos(a)*r,z=Math.sin(a)*r,s=.75+rng()*.65,c=new THREE.Mesh(geo,material);c.scale.set(s*.62,s*(2.4+rng()*1.9),s*.62);c.position.set(x,heightFn(x,z)+.48*s,z);c.rotation.set((rng()-.5)*.14,rng()*6.28,(rng()-.5)*.22);c.castShadow=true;root.add(c);if(i<4){const l=new THREE.PointLight(0x4acff2,.72,7,2);l.position.copy(c.position).add(new THREE.Vector3(0,.8,0));root.add(l);}}return root;
 }
