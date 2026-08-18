@@ -18,9 +18,9 @@ try{
   const navStart=Date.now();
   await page.goto('http://127.0.0.1:4173',{waitUntil:'domcontentloaded',timeout:20000});
   const domMs=Date.now()-navStart;
-  await page.waitForSelector('canvas',{state:'attached',timeout:20000});
+  await page.waitForFunction(()=>!!document.querySelector('canvas')&&!!window.__GAUNTLET_CAPTURE__,{timeout:60000});
   const canvasMs=Date.now()-navStart;
-  await page.waitForFunction(()=>window.__GAUNTLET_CAPTURE__&&window.__GAUNTLET_METRICS__?.renderer?.calls>0,{timeout:60000});
+  await page.waitForFunction(()=>window.__GAUNTLET_METRICS__?.renderer?.calls>0,{timeout:60000});
   const firstRenderedMs=Date.now()-navStart;
   boot=await page.evaluate(({domMs,canvasMs,firstRenderedMs})=>({domMs,canvasMs,firstRenderedMs,mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}),{domMs,canvasMs,firstRenderedMs});
   await page.waitForTimeout(900);mark('01-idle-1080p.png');
