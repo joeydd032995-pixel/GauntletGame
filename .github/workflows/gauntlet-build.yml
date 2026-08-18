@@ -37,7 +37,7 @@ jobs:
           test -f dist/assets/authored/kaykit-dungeon/crates_stacked.obj
           test -f dist/assets/authored/kaykit-dungeon/barrel_large_decorated.obj
           test -f dist/assets/authored/kaykit-dungeon/wall_broken.obj
-          test -f dist/assets/authored/kaykit-dungeon/wall_arched.obj
+          test -f dist/assets/authored/kaykit-dungeon/wall_doorway.obj
           test -f dist/assets/authored/kaykit-dungeon/stairs_wide.obj
           test -f dist/assets/authored/kaykit-dungeon/dungeon_texture.png
           test -f dist/assets/authored/kaykit-dungeon/provenance.json
