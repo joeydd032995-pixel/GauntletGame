@@ -36,5 +36,8 @@ jobs:
           test -f dist/assets/authored/kaykit-dungeon/pillar_decorated.obj
           test -f dist/assets/authored/kaykit-dungeon/crates_stacked.obj
           test -f dist/assets/authored/kaykit-dungeon/barrel_large_decorated.obj
+          test -f dist/assets/authored/kaykit-dungeon/wall_broken.obj
+          test -f dist/assets/authored/kaykit-dungeon/wall_arched.obj
+          test -f dist/assets/authored/kaykit-dungeon/stairs_wide.obj
           test -f dist/assets/authored/kaykit-dungeon/provenance.json
           node -e "const p=require('./dist/assets/authored/character-source.json'); if(p.tier!=='quaternius-base-intermediate'&&p.tier!=='production-quaternius') process.exit(1); if(!p.actors?.hero?.url||!p.actors?.enemy?.url) process.exit(1);"
