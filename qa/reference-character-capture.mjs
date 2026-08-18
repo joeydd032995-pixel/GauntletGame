@@ -30,21 +30,18 @@ try{
   await bounded('wait turntable canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:TURN_W,h:TURN_H},{timeout:30000}),35_000);await page.waitForTimeout(250);
 
   async function turntable(subject,action,distance,height,fov){
-    await bounded(`${subject} turntable enter`,()=>page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true}),30_000);
-    await bounded(`${subject} 360 turntable sweep`,()=>page.evaluate(async()=>{
-      const steps=16;
-      for(let i=0;i<=steps;i++){
-        window.__GAUNTLET_CAPTURE__.setAngle(i/steps*360);
-        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-      }
-      return window.__GAUNTLET_CAPTURE__.snapshot();
-    }),45_000);
+    const duration=6;
+    await bounded(`${subject} timed turntable enter`,()=>page.evaluate(o=>window.__GAUNTLET_CAPTURE__.enter(o),{subject,action,view:'front',distance,height,fov,neutral:true,turntableSeconds:duration}),30_000);
+    await page.waitForTimeout((duration+4)*1000);
+    const snapshot=await bounded(`${subject} timed turntable verify`,()=>page.evaluate(()=>window.__GAUNTLET_CAPTURE__.snapshot()),30_000);
+    if(!snapshot?.turntable?.completed)throw new Error(`${subject} timed turntable did not complete: ${JSON.stringify(snapshot?.turntable||null)}`);
+    if(Math.abs((snapshot.angleDegrees||0)-360)>2)throw new Error(`${subject} timed turntable ended at ${snapshot.angleDegrees}deg instead of 360deg`);
   }
   await turntable('hero','idle',4.8,1.12,39);await turntable('enemy','enemyIdle',5.25,1.22,41);
 
   await bounded('set QHD viewport',()=>page.setViewportSize({width:W,height:H}));
   await bounded('wait QHD canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:W,h:H},{timeout:30000}),35_000);await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
-  const boot={bootResolution:[BOOT_W,BOOT_H],turntableResolution:[TURN_W,TURN_H],turntableSteps:16,stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null,authored};
+  const boot={bootResolution:[BOOT_W,BOOT_H],turntableResolution:[TURN_W,TURN_H],turntableSeconds:6,stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null,authored};
 
   const shots=[
     ['hero-idle-front',{subject:'hero',action:'idle',view:'front',distance:4.6,height:1.12,fov:38,neutral:true},650],['hero-idle-three-quarter',{subject:'hero',action:'idle',view:'threeQuarter',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-idle-side',{subject:'hero',action:'idle',view:'side',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-idle-rear',{subject:'hero',action:'idle',view:'rear',distance:4.8,height:1.12,fov:39,neutral:true},500],['hero-walk-rear',{subject:'hero',action:'walk',view:'rear',distance:5.4,height:1.3,fov:44},850],['hero-run-rear',{subject:'hero',action:'run',view:'rear',distance:5.6,height:1.34,fov:45},650],['hero-sprint-rear',{subject:'hero',action:'sprint',view:'rear',distance:5.8,height:1.38,fov:46},520],['hero-sever-strike',{subject:'hero',action:'attack',view:'threeQuarter',distance:5.0,height:1.22,fov:41},300],['hero-rift-performance',{subject:'hero',action:'rift',view:'threeQuarter',distance:5.2,height:1.22,fov:42},650],['hero-guard',{subject:'hero',action:'guard',view:'threeQuarter',distance:4.9,height:1.18,fov:40},190],['hero-parry',{subject:'hero',action:'parry',view:'threeQuarter',distance:4.9,height:1.18,fov:40},180],['hero-evade',{subject:'hero',action:'dodge',view:'side',distance:5.4,height:1.24,fov:43},310],['warden-idle-three-quarter',{subject:'enemy',action:'enemyIdle',view:'threeQuarter',distance:5.3,height:1.25,fov:41,neutral:true},600],['warden-attack',{subject:'enemy',action:'enemyAttack',view:'threeQuarter',distance:5.5,height:1.25,fov:42},520],['warden-heavy',{subject:'enemy',action:'enemyHeavy',view:'threeQuarter',distance:5.5,height:1.25,fov:42},710]
@@ -70,4 +67,4 @@ const videos=(await fs.readdir(path.join(out,'video')).catch(()=>[])).filter(f=>
 if(captureError)throw captureError;
 if(!videos.length)throw new Error('Character motion evidence rejected: no 1080p WebM produced');
 if(errors.length)throw new Error(`Character reference capture rejected:\n${errors.join('\n')}`);
-console.log(`Authored character reference capture: PASS (15 QHD frames, ${videos.length} motion video; 720p turntable phase + QHD still phase)`);
+console.log(`Authored character reference capture: PASS (15 QHD frames, ${videos.length} motion video; runtime-timed turntables + QHD still phase)`);
