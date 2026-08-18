@@ -8,11 +8,14 @@ const ROOT=`https://raw.githubusercontent.com/${REPO}/${REV}/addons/kaykit_dunge
 const assets=[
   {file:'pillar_decorated.obj',role:'authored ruin pillar'},
   {file:'crates_stacked.obj',role:'authored supply cluster'},
-  {file:'barrel_large_decorated.obj',role:'authored decorated barrel'}
+  {file:'barrel_large_decorated.obj',role:'authored decorated barrel'},
+  {file:'wall_broken.obj',role:'authored broken ruin wall'},
+  {file:'wall_arched.obj',role:'authored arched landmark wall'},
+  {file:'stairs_wide.obj',role:'authored broad stone stairs'}
 ];
 const outDir=path.resolve('public/assets/authored/kaykit-dungeon');
 await mkdir(outDir,{recursive:true});
-const provenance={source:'KayKit Dungeon Remastered',repository:REPO,revision:REV,license:'CC0 1.0',purpose:'Authored hero environment baseline for Gauntlet OSRS hybrid dressing',files:{}};
+const provenance={source:'KayKit Dungeon Remastered',repository:REPO,revision:REV,license:'CC0 1.0',purpose:'Authored hero environment modules for Gauntlet refined-OSRS hybrid dressing',files:{}};
 for(const asset of assets){
   const url=`${ROOT}/${asset.file}`;
   const response=await fetch(url,{redirect:'follow'});
