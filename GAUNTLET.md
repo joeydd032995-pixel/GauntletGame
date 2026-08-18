@@ -22,18 +22,22 @@ Do not drift toward:
 - **Gauntlet Build Gate** — licensed/pinned asset acquisition + production Vite build + bundle verification.
 - **Gauntlet Visual QA** — production Chromium preview, scripted idle/locomotion/melee/Rift/evade sequence, 1080p WebM, five required rendered frames, browser-error capture and render telemetry.
 - **Gauntlet Character QA** — 15 required 2560×1440 character shots, hero/enemy turntables, authored-source telemetry, motion video, clip-map audit and structural critic.
+- **Environment Gauntlet Critic** — requires three streamed tree species, active near/far tree LODs, clustered multi-type undergrowth, five terrain layers, non-trivial micro height/normal response, and five unique rendered gameplay frames. Structural success still returns `STRUCTURAL_PASS_VISUAL_REVIEW_REQUIRED`, never art acceptance.
 - Missing assets, missing frames, browser/runtime errors, duplicate evidence, invalid motion coverage or visible procedural character geometry fail their relevant gate.
 - Hybrid environment evidence is not captured until `__GAUNTLET_HYBRID_ENVIRONMENT__.ready === true`.
+- Environment evidence additionally waits for `__GAUNTLET_GROUND_DETAIL__`, `__GAUNTLET_TERRAIN_MATERIAL__`, and three-species `__GAUNTLET_STREAMING_ENVIRONMENT__` telemetry.
 
 ## Specialist / critic protocol
 
 Work is organized into explicit specialist and harsh-critic lanes:
 1. Character Asset
 2. Animation & Motion
-3. Environment & Hybrid Dressing
-4. Terrain & Ground Material
-5. Lighting, Atmosphere & Polish
-6. UI/HUD & Overall Presentation
+3. Tree & Canopy
+4. Foliage & Undergrowth
+5. Terrain Material & Layering
+6. Environment Cohesion & Performance
+7. Lighting, Atmosphere & Polish
+8. UI/HUD & Overall Presentation
 
 A specialist lane may implement changes but cannot declare acceptance. A harsh critic must inspect real screenshots/motion and compare against OSRS/07Scape readability, density, weight and presentation before any lane can become ACCEPTED.
 
@@ -63,23 +67,64 @@ The production ingest tier now targets the CC0 Quaternius ecosystem:
 
 **Hold:** production-tier visible motion still needs real evidence for weight, anticipation, strike timing, recovery, planted feet and OSRS-like snappy readability.
 
+### Tree & Canopy — CANDIDATE / NOT VISUALLY APPROVED
+
+The single generic streamed tree has been replaced with a deterministic three-species kit:
+- **Frontier Oak** — broad, irregular branched trunk and clustered rounded leaf-card masses.
+- **Silver Ash** — taller/narrower trunk architecture and vertically biased canopy silhouette.
+- **Ashen Pine** — tiered conifer crown with a clearly separate evergreen silhouette.
+
+Each species has its own bark/leaf palette, proportions and crown architecture. Streamed trees now use near-detail crowns and lower-cost far crown hulls rather than simply hiding the canopy at distance. Species, active tree count and near/far LOD state are exposed through `__GAUNTLET_STREAMING_ENVIRONMENT__`.
+
+**Hold:** screenshots must prove the three species read distinctly at gameplay distance, avoid card-cloud noise, and materially exceed the old repeated crown silhouette.
+
+### Foliage & Undergrowth — CANDIDATE / NOT VISUALLY APPROVED
+
+Near-field dressing is no longer one grass-clump population scattered around a ring. `GroundDetail` now contains separate instanced populations for:
+- multi-blade grass clumps
+- ferns
+- broadleaf ground plants
+- flowers
+- pebbles
+
+Placement uses ten deterministic density clusters with protected combat-lane clearance. Scale and color variation are constrained by plant family rather than unconstrained random noise. Runtime density telemetry is exposed through `__GAUNTLET_GROUND_DETAIL__`.
+
+**Hold:** screenshots must still prove that density feels intentional rather than procedural, the foreground is richer without becoming cluttered, and flowers/ferns remain readable instead of collapsing into texture noise.
+
 ### Environment & Hybrid Dressing — CANDIDATE / NOT VISUALLY APPROVED
 
-The arena is transitioning from procedural/instanced-only dressing toward a hybrid model:
+The arena uses a hybrid model:
 - authored CC0 hero props are pinned and acquired with provenance
 - deterministic foreground/midground authored placements are loaded through `hybridEnvironment.js`
 - background instancing remains for scalable density
 - readiness/mesh/triangle/instance telemetry is exposed through `__GAUNTLET_HYBRID_ENVIRONMENT__`
 
-Current authored baseline includes curated dungeon pillars, stacked crates and decorated barrels. These are not accepted merely because they load.
+Current authored baseline includes curated dungeon pillars, stacked crates, decorated barrels, broken walls, doorway pieces and stairs. Shared stone and foliage materials have been regraded toward a warmer, matte refined-OSRS palette with reduced generic PBR sheen/noise.
 
-**Hold:** fresh captures must prove that authored hero pieces materially break repetition, create hierarchy and remove the “efficient but empty web demo” read.
+**Hold:** fresh captures must prove that authored hero pieces, upgraded vegetation and material regrading form one coherent world and remove the “efficient but empty web demo” read.
 
-### Terrain & Ground Material — CANDIDATE
+### Terrain & Ground Material — CANDIDATE / NOT VISUALLY APPROVED
 
-Existing layered terrain and ground detail remain functional, but the new target requires more deliberate grass/dirt/stone zoning, edge variation, contact grounding and readable combat-space composition.
+Terrain now has an explicit five-layer stylized stack:
+- grass
+- dirt
+- worn path
+- rock
+- moss
 
-**Hold:** terrain remains below final refined-OSRS acceptance until the authored environment composition is visually established.
+The layer composition includes a meandering worn corridor, arena wear, slope-driven rock, sheltered moss, macro breakup, 384px generated micro detail repeated at higher frequency, stronger normal/bump response and a very small geometry-level micro-height perturbation. Telemetry is exposed through `__GAUNTLET_TERRAIN_MATERIAL__`.
+
+**Hold:** the harsh critic must verify that the ground reads as layered and grounded in actual screenshots, does not become noisy or photorealistic, and keeps the combat lane legible.
+
+### Environment Cohesion & Performance — CANDIDATE / NOT VISUALLY APPROVED
+
+- Tree detail is instanced per species and swaps near/far crown representation by chunk distance.
+- Undergrowth remains instanced and clustered around intentional density anchors.
+- Central combat readability is explicitly protected from high plant density.
+- Shared stone/foliage materials use restrained matte response and lower environment-map intensity.
+- The existing adaptive resolution governor and renderer telemetry remain active.
+
+**Hold:** final rendered frames and telemetry must demonstrate that the density increase does not cause unacceptable frame time, draw-call pressure, foliage aliasing, or silhouette collapse.
 
 ### Lighting, Atmosphere & Polish — CANDIDATE
 
@@ -97,6 +142,8 @@ The current HUD is functional but not final. It must become more crafted and in-
 - Build and Visual QA subsequently progressed successfully through the authored runtime.
 - Character capture was hardened with stage-level watchdogs and guaranteed cleanup so a stalled screenshot/turntable/video finalization produces deterministic rejection instead of consuming the workflow timeout.
 - Visual QA now waits for authored hybrid-environment readiness before accepting evidence.
+- Environment Gauntlet introduced multi-species tree LOD telemetry, clustered ground-cover telemetry and layered-terrain telemetry into the visual evidence package.
+- The environment critic now rejects missing tree variety, insufficient near-field plant density, missing terrain layers, absent near/far LOD states, low-information screenshots or duplicate evidence frames.
 
 ## Acceptance rules
 
@@ -105,8 +152,10 @@ A high-end OSRS/07Scape claim requires all of the following:
 - production-tier visible authored/retargeted animation coverage
 - zero visible procedural character meshes
 - strong silhouettes at gameplay camera distance
+- at least three cohesive but visually distinct tree species
+- dense but intentionally clustered near-field undergrowth with a protected combat lane
+- clearly readable grass/dirt/path/rock/moss terrain layering and convincing contact grounding
 - authored foreground/midground environmental identity plus intentional background density
-- terrain and props visibly grounded
 - restrained stylized materials and lighting
 - readable combat poses and effects
 - HUD clarity that fits the world
@@ -118,4 +167,4 @@ Passing structural tests is necessary but insufficient.
 
 **REJECTED — NOT READY TO MERGE.**
 
-The infrastructure has crossed from procedural prototype toward a production-capable authored pipeline, but the visible character tier remains a rejected scaffold and the hybrid environment has not yet earned visual approval. No claim that Gauntlet matches or beats high-quality OSRS/07Scape is permitted until fresh production-tier captures support it.
+The environment branch has materially replaced the old single-species/simple-instancing presentation with a multi-species, clustered, layered refined-OSRS environment pipeline. None of those lanes are visually accepted until the newest five-frame evidence set is inspected directly. Character production tier also remains an independent hard blocker. No claim that Gauntlet matches or beats high-quality OSRS/07Scape is permitted until fresh rendered evidence supports it.
