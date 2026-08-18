@@ -15,7 +15,7 @@ export function createHeroRig(){
     hips.add(thigh);thigh.add(shin);shin.add(foot);
     limbs[`${side.toLowerCase()}UpperArm`]=upper;limbs[`${side.toLowerCase()}LowerArm`]=lower;limbs[`${side.toLowerCase()}Hand`]=hand;limbs[`${side.toLowerCase()}Thigh`]=thigh;limbs[`${side.toLowerCase()}Shin`]=shin;limbs[`${side.toLowerCase()}Foot`]=foot;
   }
-  const weaponRoot=bone('WeaponRoot',0,-.035,.035);limbs.rightHand.add(weaponRoot);weaponRoot.rotation.set(.04,0,-.18);
+  const weaponRoot=bone('WeaponRoot',0,-.035,.035);limbs.rightHand.add(weaponRoot);weaponRoot.rotation.set(.035,0,Math.PI+.1);
   return{group,bones:{hips,spine,chest,neck,head,leftFoot:limbs.leftFoot,rightFoot:limbs.rightFoot,rightArm:limbs.rightUpperArm,...limbs},weaponRoot};
 }
 
