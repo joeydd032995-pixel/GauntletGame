@@ -1,0 +1,32 @@
+name: Gauntlet Character QA
+on:
+  push:
+    branches: ['sol/character-gauntlet']
+  pull_request:
+    branches: [main]
+
+jobs:
+  character-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npx playwright install chromium
+      - name: Start production preview
+        run: npm run preview -- --port 4173 > /tmp/gauntlet-preview.log 2>&1 &
+      - name: Wait for runtime
+        run: npx --yes wait-on http://127.0.0.1:4173 --timeout 30000
+      - name: Capture character evidence
+        run: npm run qa:character
+      - name: Upload character evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauntlet-character-evidence
+          path: artifacts/character-reference/
+          retention-days: 14
