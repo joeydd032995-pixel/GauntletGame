@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createWardenAuthoredAnimationSet } from './authoredAnimation.js';
 
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const damp=(a,b,lambda,dt)=>THREE.MathUtils.damp(a,b,lambda,dt);
@@ -52,4 +53,4 @@ export class FootIK{
   #find(names){let found=null;this.root.traverse(o=>{if(!found&&o.isBone&&names.includes(o.name))found=o;});return found;}
 }
 
-export function authorEnemyClips(){return{};}
+export function authorEnemyClips(root){return createWardenAuthoredAnimationSet({group:root});}
