@@ -20,14 +20,14 @@ try{
   await bounded('navigate preview',()=>page.goto('http://127.0.0.1:4173',{waitUntil:'domcontentloaded',timeout:20000}),25_000);const domMs=Date.now()-navStart;
   await bounded('wait capture API',()=>page.waitForFunction(()=>!!document.querySelector('canvas')&&!!window.__GAUNTLET_CAPTURE__,null,{timeout:60000}),65_000);const canvasMs=Date.now()-navStart;
   await bounded('wait first render',()=>page.waitForFunction(()=>window.__GAUNTLET_METRICS__?.renderer?.calls>0,null,{timeout:60000}),65_000);const firstRenderedMs=Date.now()-navStart;
-  await bounded('wait authored characters',()=>page.waitForFunction(()=>window.__GAUNTLET_AUTHORED_CHARACTERS__?.ready===true,null,{timeout:60000}),65_000);const authoredReadyMs=Date.now()-navStart;
+  await bounded('wait authored character terminal state',()=>page.waitForFunction(()=>{const s=window.__GAUNTLET_AUTHORED_CHARACTERS__;return s?.ready===true||!!s?.error||!!s?.hero?.error||!!s?.enemy?.error;},null,{timeout:90000}),95_000);const authoredReadyMs=Date.now()-navStart;
   const authored=await bounded('read authored telemetry',()=>page.evaluate(()=>JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__))));
-  if(authored.error||!authored.hero?.installed||!authored.enemy?.installed)throw new Error(`Authored character presentation rejected before capture: ${JSON.stringify(authored)}`);
+  if(!authored?.ready||authored.error||authored.hero?.error||authored.enemy?.error||!authored.hero?.installed||!authored.enemy?.installed)throw new Error(`Authored character presentation rejected before capture: ${JSON.stringify(authored)}`);
   await bounded('wait mocap state',()=>page.waitForFunction(()=>window.__GAUNTLET_MOCAP__&&['ready','partial','rejected'].includes(window.__GAUNTLET_MOCAP__.status),null,{timeout:30000}),35_000);
   const mocap=await bounded('read mocap telemetry',()=>page.evaluate(()=>window.__GAUNTLET_MOCAP__));if(mocap.status!=='ready')throw new Error(`Mocap retarget rejected before capture: ${JSON.stringify(mocap)}`);
   await bounded('set QHD viewport',()=>page.setViewportSize({width:W,height:H}));
   await bounded('wait QHD canvas',()=>page.waitForFunction(({w,h})=>{const c=document.querySelector('canvas');return !!c&&c.width>=w&&c.height>=h;},{w:W,h:H},{timeout:30000}),35_000);await page.waitForTimeout(750);const qhdReadyMs=Date.now()-navStart;
-  const boot={bootResolution:[BOOT_W,BOOT_H],stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null};
+  const boot={bootResolution:[BOOT_W,BOOT_H],stillResolution:[W,H],domMs,canvasMs,firstRenderedMs,authoredReadyMs,qhdReadyMs,mocapTotalMs:mocap.totalMs??null,authored};
   await bounded('hide HUD',()=>page.evaluate(()=>{const hud=document.querySelector('#hud');if(hud)hud.style.visibility='hidden';}));await page.waitForTimeout(350);
 
   async function turntable(subject,action,distance,height,fov){
