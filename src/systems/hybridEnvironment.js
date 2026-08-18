@@ -8,7 +8,7 @@ const SOURCES={
   crates:`${BASE}/crates_stacked.obj`,
   barrel:`${BASE}/barrel_large_decorated.obj`,
   brokenWall:`${BASE}/wall_broken.obj`,
-  archedWall:`${BASE}/wall_arched.obj`,
+  doorway:`${BASE}/wall_doorway.obj`,
   stairs:`${BASE}/stairs_wide.obj`
 };
 
@@ -33,21 +33,26 @@ export async function installHybridEnvironment({scene,heightFn}){
     await Promise.all(Object.entries(SOURCES).map(async([kind,url])=>{const object=await loader.loadAsync(url);const audit=tune(object,authoredMaterial);status.assets[kind]={url,...audit};loaded[kind]=object;}));
     const root=new THREE.Group();root.name='AuthoredHeroEnvironment';root.userData.authoredHeroEnvironment=true;
     const placements=[
-      ['archedWall',{x:0,z:-11.25,rotation:0,scale:1.12,kind:'archedWall'}],
-      ['stairs',{x:0,z:-9.45,rotation:Math.PI,scale:1.03,kind:'stairs',yOffset:.01}],
-      ['pillar',{x:-2.35,z:-10.95,rotation:.12,scale:1.0,kind:'pillar'}],
-      ['pillar',{x:2.35,z:-10.95,rotation:-.12,scale:1.0,kind:'pillar'}],
+      // South authored approach: readable doorway + broken-wall shoulders instead of one blank slab.
+      ['doorway',{x:0,z:-11.2,rotation:0,scale:1.0,kind:'doorway'}],
+      ['brokenWall',{x:-2.25,z:-11.05,rotation:.18,scale:.9,kind:'brokenWall'}],
+      ['brokenWall',{x:2.25,z:-11.05,rotation:-.18,scale:.9,kind:'brokenWall'}],
+      ['stairs',{x:0,z:-9.35,rotation:Math.PI,scale:1.0,kind:'stairs',yOffset:.01}],
+      ['pillar',{x:-3.35,z:-10.8,rotation:.12,scale:.96,kind:'pillar'}],
+      ['pillar',{x:3.35,z:-10.8,rotation:-.12,scale:.96,kind:'pillar'}],
+      // West landmark: broken ruin mass, intentionally asymmetric.
       ['brokenWall',{x:-10.4,z:-.7,rotation:Math.PI*.48,scale:1.2,kind:'brokenWall'}],
       ['pillar',{x:-9.45,z:2.05,rotation:1.7,scale:.86,kind:'pillar'}],
       ['crates',{x:-8.55,z:-2.5,rotation:-.42,scale:.9,kind:'crates'}],
       ['barrel',{x:-7.75,z:-3.05,rotation:.3,scale:.84,kind:'barrel'}],
+      // North-east landmark: smaller ruin/supply story to break radial repetition.
       ['brokenWall',{x:8.8,z:6.8,rotation:-.72,scale:.98,kind:'brokenWall'}],
       ['crates',{x:7.15,z:8.15,rotation:.88,scale:.86,kind:'crates'}],
       ['barrel',{x:6.3,z:8.7,rotation:-.2,scale:.8,kind:'barrel'}],
       ['barrel',{x:9.65,z:5.25,rotation:1.18,scale:.76,kind:'barrel'}]
     ];
-    const landmarkAnchors=[{x:0,z:-10.8},{x:-9.7,z:-.2},{x:8.5,z:7.0}];
+    const landmarkAnchors=[{x:0,z:-10.7},{x:-9.7,z:-.2},{x:8.5,z:7.0}];
     for(const[kind,opts]of placements){const source=loaded[kind];root.add(clonePlaced(source,{...opts,heightFn}));status.instances++;status.triangles+=status.assets[kind]?.triangles||0;}
-    status.landmarks=landmarkAnchors.length;status.suppressedProcedural=suppressProceduralNear(scene,landmarkAnchors,3.75);scene.add(root);status.ready=true;status.root=root.name;return root;
+    status.landmarks=landmarkAnchors.length;status.suppressedProcedural=suppressProceduralNear(scene,landmarkAnchors,4.0);scene.add(root);status.ready=true;status.root=root.name;return root;
   }catch(error){status.error=String(error?.message||error);throw error;}
 }
