@@ -28,7 +28,17 @@
         <button data-key="3"><span class="icon guard"></span><kbd>3</kbd><b>Guard</b><small id="cd3"></small></button>
         <button data-key="Space"><span class="icon evade"></span><kbd>SPACE</kbd><b>Evade</b><small id="cd4"></small></button>
       </div>
-      <div class="controls"><span>WASD</span> Move <span>SHIFT</span> Sprint <span>RMB</span> Orbit <span>1–3</span> Abilities</div>
+      <div class="controls"><span>WASD</span> Move <span>SHIFT</span> Sprint <span>RMB</span> Orbit <span>1–3</span> Abilities <span>5–9</span> Race</div>
+      <div class="race-picker" id="racePicker" aria-label="Player race selector">
+        <div class="race-head"><span>PLAYER RACE</span><b id="raceName">LOADING</b></div>
+        <div class="race-options">
+          <button type="button" data-race="cairnborn">Cairnborn</button>
+          <button type="button" data-race="brinesworn">Brinesworn</button>
+          <button type="button" data-race="myceliad">Myceliad</button>
+          <button type="button" data-race="veylkin">Veylkin</button>
+          <button type="button" data-race="echoed">Echoed</button>
+        </div>
+      </div>
       <div class="damage-edge" id="damageEdge"></div><div class="vignette"></div>
     </div>
     <script type="module" src="/src/bootstrap.js"></script>

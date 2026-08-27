@@ -10,12 +10,13 @@
     "assets:mocap": "node scripts/acquire-mocap.mjs",
     "assets:characters": "node scripts/acquire-authored-characters.mjs",
     "assets:environment": "node scripts/acquire-authored-environment.mjs",
-    "assets:licensed": "npm run assets:mocap && npm run assets:characters && npm run assets:environment",
+    "assets:licensed": "npm run assets:mocap && npm run assets:characters && npm run assets:environment && npm run assets:races",
     "qa:visual": "node qa/capture.mjs",
     "qa:environment:critic": "node qa/environment-critic.mjs",
     "qa:character": "node qa/reference-character-capture.mjs",
     "qa:character:critic": "node qa/character-critic.mjs",
-    "qa:blind": "node qa/blind-compare.mjs"
+    "qa:blind": "node qa/blind-compare.mjs",
+    "assets:races": "node scripts/build-race-proxies.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

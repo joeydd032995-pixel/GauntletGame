@@ -1,4 +1,5 @@
 import './styles.css';
+import './races.css';
 import * as THREE from 'three';
 import { PhysicsWorld, terrainNormalFromHeight } from './systems/physics.js';
 import { AnimationGraph, authorEnemyClips } from './systems/animation.js';
@@ -14,6 +15,7 @@ import { buildRuinArena, buildCrystalField } from './systems/environment.js';
 import { ThirdPersonCameraRig } from './systems/cameraRig.js';
 import { applyHeroArtPass, applyEnemyArtPass, updateProductionCharacterLOD } from './systems/characterArt.js';
 import { CharacterCaptureDirector } from './systems/captureDirector.js';
+import { installRaceCharacterSystem } from './systems/raceCharacters.js';
 
 const app=document.querySelector('#app');
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x071116);scene.fog=new THREE.FogExp2(0x09161a,.0065);
@@ -31,6 +33,12 @@ let seed=712367;const rng=()=>((seed=(seed*48271)%2147483647)/2147483647);
 buildRuinArena({scene,physics,heightFn,rng});buildCrystalField({scene,heightFn,rng});
 
 const heroRig=createHeroRig();const heroArt=applyHeroArtPass(heroRig);const hero=heroRig.group;hero.position.set(0,heightFn(0,4),4);scene.add(hero);
+const raceSystem=installRaceCharacterSystem(hero);
+const raceKeys={Digit5:'cairnborn',Digit6:'brinesworn',Digit7:'myceliad',Digit8:'veylkin',Digit9:'echoed'};
+const raceButtons=[...document.querySelectorAll('[data-race]')];
+for(const button of raceButtons)button.addEventListener('click',()=>raceSystem.setRace(button.dataset.race));
+function syncRaceHud(){const race=raceSystem.snapshot();const name=document.querySelector('#raceName');if(name)name.textContent=(race.label||race.current||'LOADING').toUpperCase();for(const b of raceButtons)b.classList.toggle('active',b.dataset.race===race.current);}
+window.addEventListener('gauntlet-race-change',syncRaceHud);
 const heroBody=physics.createCharacter(hero.position,{radius:.43,height:1.9,stepHeight:.44,slopeLimit:.7,acceleration:38,braking:46});
 const heroAnim=new AnimationGraph({root:hero,clips:createProceduralClips(heroRig),terrainHeight:heightFn,terrainNormal:normalFn});heroAnim.trigger('idle',{loop:true});
 const enemyRig=createEnemyRig();const enemyArt=applyEnemyArtPass(enemyRig);const enemy=enemyRig.group;enemy.position.set(0,heightFn(0,-4),-4);scene.add(enemy);
@@ -48,6 +56,7 @@ const dustCount=450,dustGeo=new THREE.BufferGeometry(),dustPos=new Float32Array(
 const keys=new Set();let yaw=0,dragging=false,lastX=0,lastY=0,stamina=100,hp=100,enemyHp=100,riftT=0,guardT=0,attackT=0,attackWindow=false,dodgeT=0,time=0;
 const unlock=()=>audio.unlock().catch(()=>{});addEventListener('pointerdown',unlock,{once:true});addEventListener('keydown',unlock,{once:true});
 addEventListener('keydown',e=>{keys.add(e.code);if(e.repeat||capture.active)return;
+  if(raceKeys[e.code]){raceSystem.setRace(raceKeys[e.code]);return;}
   if(e.code==='Digit1'&&attackT<=0&&hp>0){attackT=.74;attackWindow=true;heroAnim.trigger('attack',{fade:.028});const dir=new THREE.Vector3(Math.sin(hero.rotation.y),0,Math.cos(hero.rotation.y));vfx.slash({origin:hero.position.clone().add(new THREE.Vector3(0,1.25,0)),direction:dir});audio.playWhoosh(hero.position.clone().add(new THREE.Vector3(0,1.2,0)),1);}
   if(e.code==='Digit2'&&riftT<=0&&hp>0){riftT=4;heroAnim.trigger('rift',{fade:.035});vfx.rift(hero.position.clone(),{radius:3.6});audio.playRift(hero.position,1);if(hero.position.distanceTo(enemy.position)<8.2&&enemyHp>0){enemyHp=Math.max(0,enemyHp-28);enemyAnim.trigger('enemyHit',{fade:.025});vfx.impact(enemy.position.clone().add(new THREE.Vector3(0,1.5,0)),{color:0x9cecff,count:24,scale:1.15});audio.playImpact(enemy.position,1.15);}}
   if(e.code==='Digit3'&&guardT<=0&&hp>0){guardT=.58;heroAnim.trigger('guard',{fade:.035});}
@@ -77,15 +86,15 @@ function update(dt){
   heroShadow.update(hero.position,heightFn,.9);enemyShadow.update(enemy.position,heightFn,1.15);enemyShadow.mesh.visible=enemyHp>0;
   const combat=!capture.active&&enemyHp>0&&hero.position.distanceTo(enemy.position)<16?1:0;audio.setCombatIntensity(combat,dt);rendering.update(dt,{combat,darkness:capture.active&&capture.neutral?.28:.58});lights.fill.position.lerp(hero.position.clone().add(new THREE.Vector3(0,6,4)),1-Math.exp(-dt*2));
   if(!capture.active){cameraRig.yaw=yaw;cameraRig.update(dt,{player:hero.position,target:enemyHp>0?enemy.position:null,combat:!!combat,impulse:vfx.impulse});}
-  updateProductionCharacterLOD(hero,camera);updateProductionCharacterLOD(enemy,camera);updateHud(keys.has('ShiftLeft'),combat);
-  window.__GAUNTLET_METRICS__={heroAnimation:heroAnim.getTelemetry(),enemyAnimation:enemyAnim.getTelemetry(),capture:capture.snapshot(),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries}};
+  updateProductionCharacterLOD(hero,camera);updateProductionCharacterLOD(enemy,camera);raceSystem.update(dt,heroAnim.state,Math.hypot(heroBody.velocity.x,heroBody.velocity.z));syncRaceHud();updateHud(keys.has('ShiftLeft'),combat);
+  window.__GAUNTLET_METRICS__={heroAnimation:heroAnim.getTelemetry(),enemyAnimation:enemyAnim.getTelemetry(),capture:capture.snapshot(),race:raceSystem.snapshot(),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries}};
 }
 
 function updateHud(sprint,combat){document.querySelector('#hp').style.width=`${hp}%`;document.querySelector('#stamina').style.width=`${stamina}%`;document.querySelector('#enemyHp').style.width=`${enemyHp}%`;document.querySelector('#hpText').textContent=`${Math.ceil(hp)} / 100`;document.querySelector('#staminaText').textContent=Math.ceil(stamina);document.querySelector('#targetCard').classList.toggle('hidden',capture.active||!combat||enemyHp<=0);document.querySelector('#status').textContent=capture.active?'CAPTURE':hp<=0?'DOWNED':guardT>0?'GUARDING':dodgeT>0?'EVADING':sprint?'SPRINTING':combat?'ENGAGED':'READY';document.querySelector('#cd1').textContent=attackT>0?attackT.toFixed(1):'';document.querySelector('#cd2').textContent=riftT>0?riftT.toFixed(1):'';document.querySelector('#cd3').textContent=guardT>0?guardT.toFixed(1):'';document.querySelector('#cd4').textContent=dodgeT>0?dodgeT.toFixed(1):'';const card=document.querySelector('#targetCard');card.dataset.state=enemyBrain.state;}
 
 window.__GAUNTLET_CAPTURE__={
   enter:opts=>capture.enter(opts),exit:()=>capture.exit(),setAngle:d=>capture.setAngle(d),setAction:a=>capture.setAction(a),setSubject:s=>capture.setSubject(s),snapshot:()=>capture.snapshot(),
-  quality:()=>({hero:heroArt.quality,enemy:enemyArt.quality,heroAnimation:heroAnim.getTelemetry(),enemyAnimation:enemyAnim.getTelemetry()})
+  quality:()=>({hero:heroArt.quality,enemy:enemyArt.quality,race:raceSystem.snapshot(),heroAnimation:heroAnim.getTelemetry(),enemyAnimation:enemyAnim.getTelemetry()})
 };
 
 const clock=new THREE.Clock();function loop(){requestAnimationFrame(loop);update(Math.min(clock.getDelta(),.033));rendering.composer.render();}loop();
