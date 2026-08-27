@@ -7,7 +7,7 @@ if (typeof globalThis.FileReader === 'undefined') {
   globalThis.FileReader = class FileReader {
     constructor(){ this.result=null; this.onloadend=null; this.onerror=null; }
     async readAsArrayBuffer(blob){ try{ this.result=await blob.arrayBuffer(); this.onloadend?.({target:this}); }catch(error){ this.onerror?.(error); } }
-    async readAsDataURL(blob){ try{ const b=Buffer.from(await blob.arrayBuffer()); this.result=\`data:\${blob.type||'application/octet-stream'};base64,\${b.toString('base64')}\`; this.onloadend?.({target:this}); }catch(error){ this.onerror?.(error); } }
+    async readAsDataURL(blob){ try{ const b=Buffer.from(await blob.arrayBuffer()); this.result=`data:${blob.type||'application/octet-stream'};base64,${b.toString('base64')}`; this.onloadend?.({target:this}); }catch(error){ this.onerror?.(error); } }
   };
 }
 
@@ -59,22 +59,22 @@ function makeHumanoid({name,height=1.82,shoulder=.42,hip=.29,skin,cloth,leather,
 
   const upperLen=.37*scale, foreLen=.34*scale;
   for(const [side,sgn] of [['L',-1],['R',1]]){
-    const upper=new THREE.Group();upper.name=\`upper_arm_\${side}\`;upper.position.set(sgn*shoulder*.96*bulk,.16*scale,0);upper.rotation.z=deg(sgn*35);torso.add(upper);
-    const um=cyl(\`upper_arm_\${side}_mesh\`,.075*bulk,upperLen,cloth,8);um.position.y=-upperLen/2;upper.add(um);
-    const fore=new THREE.Group();fore.name=\`forearm_\${side}\`;fore.position.y=-upperLen;upper.add(fore);
-    const fm=cyl(\`forearm_\${side}_mesh\`,.064*bulk,foreLen,skin,8);fm.position.y=-foreLen/2;fore.add(fm);
-    const hand=new THREE.Group();hand.name=\`hand_\${side}\`;hand.position.y=-foreLen;fore.add(hand);
-    const hm=sphere(\`hand_\${side}_mesh\`,[.06*bulk,.085*scale,.052*bulk],skin,1);hm.position.y=-.035*scale;hand.add(hm);
+    const upper=new THREE.Group();upper.name=`upper_arm_${side}`;upper.position.set(sgn*shoulder*.96*bulk,.16*scale,0);upper.rotation.z=deg(sgn*35);torso.add(upper);
+    const um=cyl(`upper_arm_${side}_mesh`,.075*bulk,upperLen,cloth,8);um.position.y=-upperLen/2;upper.add(um);
+    const fore=new THREE.Group();fore.name=`forearm_${side}`;fore.position.y=-upperLen;upper.add(fore);
+    const fm=cyl(`forearm_${side}_mesh`,.064*bulk,foreLen,skin,8);fm.position.y=-foreLen/2;fore.add(fm);
+    const hand=new THREE.Group();hand.name=`hand_${side}`;hand.position.y=-foreLen;fore.add(hand);
+    const hm=sphere(`hand_${side}_mesh`,[.06*bulk,.085*scale,.052*bulk],skin,1);hm.position.y=-.035*scale;hand.add(hm);
   }
 
   const thighLen=.42*scale, shinLen=.41*scale;
   for(const [side,sgn] of [['L',-1],['R',1]]){
-    const thigh=new THREE.Group();thigh.name=\`thigh_\${side}\`;thigh.position.set(sgn*hip*.52*bulk,-.04*scale,0);pelvis.add(thigh);
-    const tm=cyl(\`thigh_\${side}_mesh\`,.095*bulk,thighLen,cloth,8);tm.position.y=-thighLen/2;thigh.add(tm);
-    const shin=new THREE.Group();shin.name=\`shin_\${side}\`;shin.position.y=-thighLen;thigh.add(shin);
-    const sm=cyl(\`shin_\${side}_mesh\`,.078*bulk,shinLen,leather,8);sm.position.y=-shinLen/2;shin.add(sm);
-    const foot=new THREE.Group();foot.name=\`foot_\${side}\`;foot.position.y=-shinLen;shin.add(foot);
-    const fm=box(\`foot_\${side}_mesh\`,[.15*bulk,.09*scale,.27*scale],leather);fm.position.set(0,-.035*scale,.06*scale);foot.add(fm);
+    const thigh=new THREE.Group();thigh.name=`thigh_${side}`;thigh.position.set(sgn*hip*.52*bulk,-.04*scale,0);pelvis.add(thigh);
+    const tm=cyl(`thigh_${side}_mesh`,.095*bulk,thighLen,cloth,8);tm.position.y=-thighLen/2;thigh.add(tm);
+    const shin=new THREE.Group();shin.name=`shin_${side}`;shin.position.y=-thighLen;thigh.add(shin);
+    const sm=cyl(`shin_${side}_mesh`,.078*bulk,shinLen,leather,8);sm.position.y=-shinLen/2;shin.add(sm);
+    const foot=new THREE.Group();foot.name=`foot_${side}`;foot.position.y=-shinLen;shin.add(foot);
+    const fm=box(`foot_${side}_mesh`,[.15*bulk,.09*scale,.27*scale],leather);fm.position.set(0,-.035*scale,.06*scale);foot.add(fm);
   }
   return {root,torso,pelvis,head,scale};
 }
@@ -86,8 +86,8 @@ function addCairnborn(){
   const chest=box('ancestral_chest_plate',[.72,.33,.18],M.slate);chest.position.set(0,.02,-.08);c.torso.add(chest);
   const face=box('faceplate',[.24,.21,.13],M.slate);face.position.set(0,.14,-.13);c.head.add(face);
   const brow=box('brow_inlay',[.27,.045,.025],M.bronze);brow.position.set(0,.20,-.205);c.head.add(brow);
-  for(const x of [-.08,.08]){const r=box(\`rune_\${x<0?'L':'R'}\`,[.018,.22,.022],M.rune);r.position.set(x,.01,-.18);c.torso.add(r);}
-  for(const [side,sgn] of [['L',-1],['R',1]]){const s=sphere(\`shoulder_plate_\${side}\`,[.19,.12,.15],M.slate,1);s.position.set(sgn*.45,.16,0);c.torso.add(s);}
+  for(const x of [-.08,.08]){const r=box(`rune_${x<0?'L':'R'}`,[.018,.22,.022],M.rune);r.position.set(x,.01,-.18);c.torso.add(r);}
+  for(const [side,sgn] of [['L',-1],['R',1]]){const s=sphere(`shoulder_plate_${side}`,[.19,.12,.15],M.slate,1);s.position.set(sgn*.45,.16,0);c.torso.add(s);}
   const crystal=cone('lichen_crystal',.05,.15,M.moss,6);crystal.position.set(-.2,.3,.08);c.torso.add(crystal);
   return c.root;
 }
@@ -95,8 +95,8 @@ function addBrinesworn(){
   const M={skin:mat('brinesworn_skin',0x79a7a4,{roughness:.76}),cloth:mat('tide_cloth',0x2f4e52),leather:mat('weathered_leather',0x5b4632),
     metal:mat('salt_steel',0x7e8c8f,{metalness:.52,roughness:.5}),pearl:mat('pearl',0xd8d0b4,{roughness:.35}),coral:mat('coral',0xb06f67)};
   const c=makeHumanoid({name:'Brinesworn',height:1.87,shoulder:.41,hip:.28,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.98});
-  for(const [side,sgn] of [['L',-1],['R',1]]){const f=fin(\`ear_fin_\${side}\`,sgn,M.coral);f.position.set(sgn*.14,.14,0);f.rotation.x=deg(90);c.head.add(f);
-    const p=sphere(\`naval_pauldron_\${side}\`,[.15,.09,.12],M.metal,1);p.position.set(sgn*.4,.16,0);c.torso.add(p);}
+  for(const [side,sgn] of [['L',-1],['R',1]]){const f=fin(`ear_fin_${side}`,sgn,M.coral);f.position.set(sgn*.14,.14,0);f.rotation.x=deg(90);c.head.add(f);
+    const p=sphere(`naval_pauldron_${side}`,[.15,.09,.12],M.metal,1);p.position.set(sgn*.4,.16,0);c.torso.add(p);}
   const h1=box('harness_L',[.07,.58,.05],M.leather);h1.position.set(-.13,0,-.21);h1.rotation.z=deg(-16);c.torso.add(h1);
   const h2=box('harness_R',[.07,.58,.05],M.leather);h2.position.set(.13,0,-.21);h2.rotation.z=deg(16);c.torso.add(h2);
   const pearl=sphere('tide_pearl',[.04,.04,.04],M.pearl,1);pearl.position.set(-.09,.20,-.16);c.head.add(pearl);
@@ -108,9 +108,9 @@ function addMyceliad(){
   const c=makeHumanoid({name:'Myceliad',height:1.79,shoulder:.42,hip:.31,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.9});
   const cap=sphere('mushroom_crown',[.35,.11,.30],M.cap,2);cap.position.set(0,.34,0);c.head.add(cap);
   const g=sphere('mushroom_gills',[.25,.055,.22],M.gills,1);g.position.set(0,.27,0);c.head.add(g);
-  for(const [side,sgn] of [['L',-1],['R',1]]){const shelf=sphere(\`shelf_\${side}\`,[.19,.055,.14],M.gills,1);shelf.position.set(sgn*.40,.17,0);c.torso.add(shelf);}
+  for(const [side,sgn] of [['L',-1],['R',1]]){const shelf=sphere(`shelf_${side}`,[.19,.055,.14],M.gills,1);shelf.position.set(sgn*.40,.17,0);c.torso.add(shelf);}
   const chest=sphere('grown_chest_plate',[.35,.27,.23],M.leather,1);chest.position.set(0,.01,-.02);c.torso.add(chest);
-  for(const [i,x] of [[0,-.16],[1,.16]]){const sp=sphere(\`spore_\${i}\`,[.025,.025,.025],M.spore,1);sp.position.set(x,.08,-.24);c.torso.add(sp);}
+  for(const [i,x] of [[0,-.16],[1,.16]]){const sp=sphere(`spore_${i}`,[.025,.025,.025],M.spore,1);sp.position.set(x,.08,-.24);c.torso.add(sp);}
   return c.root;
 }
 function addVeylkin(){
@@ -118,11 +118,11 @@ function addVeylkin(){
     moon:mat('moon_metal',0x8b9c91,{metalness:.42,roughness:.45}),mantle:mat('moth_mantle',0x81758e,{roughness:.96}),
     eye:mat('luminous_eye',0xbbd9c8,{roughness:.25,emissive:0x42685b,emissiveIntensity:.7}),mem:mat('vestigial_membrane',0x9a8ea3,{roughness:.94})};
   const c=makeHumanoid({name:'Veylkin',height:1.91,shoulder:.39,hip:.27,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:1.0});
-  for(const [side,sgn] of [['L',-1],['R',1]]){const e=sphere(\`eye_\${side}\`,[.035,.045,.024],M.eye,1);e.position.set(sgn*.055,.15,-.13);c.head.add(e);
-    const crest=new THREE.Group();crest.name=\`sensory_crest_\${side}\`;crest.position.set(sgn*.06,.28,0);crest.rotation.z=deg(-sgn*28);c.head.add(crest);
-    const stalk=cyl(\`sensory_crest_\${side}_mesh\`,.012,.30,M.mantle,6);stalk.position.y=.15;crest.add(stalk);
-    const w=membrane(\`mantle_\${side}\`,sgn,M.mantle);w.position.set(sgn*.08,.16,.02);c.torso.add(w);
-    const back=membrane(\`vestigial_membrane_\${side}\`,sgn,M.mem);back.scale.set(.55,1.15,1);back.position.set(sgn*.05,.07,.16);c.torso.add(back);}
+  for(const [side,sgn] of [['L',-1],['R',1]]){const e=sphere(`eye_${side}`,[.035,.045,.024],M.eye,1);e.position.set(sgn*.055,.15,-.13);c.head.add(e);
+    const crest=new THREE.Group();crest.name=`sensory_crest_${side}`;crest.position.set(sgn*.06,.28,0);crest.rotation.z=deg(-sgn*28);c.head.add(crest);
+    const stalk=cyl(`sensory_crest_${side}_mesh`,.012,.30,M.mantle,6);stalk.position.y=.15;crest.add(stalk);
+    const w=membrane(`mantle_${side}`,sgn,M.mantle);w.position.set(sgn*.08,.16,.02);c.torso.add(w);
+    const back=membrane(`vestigial_membrane_${side}`,sgn,M.mem);back.scale.set(.55,1.15,1);back.position.set(sgn*.05,.07,.16);c.torso.add(back);}
   return c.root;
 }
 function addEchoed(){
@@ -132,9 +132,9 @@ function addEchoed(){
   const c=makeHumanoid({name:'Echoed',height:1.83,shoulder:.43,hip:.29,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.98});
   const bp=box('bastion_shoulder',[.22,.18,.18],M.bastion);bp.position.set(-.32,.16,0);c.torso.add(bp);
   const vp=sphere('verdant_shoulder',[.17,.09,.13],M.verdant,1);vp.position.set(.32,.16,0);c.torso.add(vp);
-  for(const [i,[x,y]] of [[0,[-.14,.06]],[1,[.12,.21]]]){const r=cone(\`relic_\${i}\`,.035,.13,M.relic,6);r.position.set(x,y,-.22);c.torso.add(r);}
+  for(const [i,[x,y]] of [[0,[-.14,.06]],[1,[.12,.21]]]){const r=cone(`relic_${i}`,.035,.13,M.relic,6);r.position.set(x,y,-.22);c.torso.add(r);}
   const iris=sphere('asymmetrical_iris',[.035,.028,.018],M.spectral,1);iris.position.set(.045,.15,-.14);c.head.add(iris);
-  for(const [i,[x,y]] of [[0,[-.04,.14]],[1,[.11,-.04]]]){const e=box(\`timeline_echo_\${i}\`,[.015,.19,.02],M.spectral);e.position.set(x,y,.22);c.torso.add(e);}
+  for(const [i,[x,y]] of [[0,[-.04,.14]],[1,[.11,-.04]]]){const e=box(`timeline_echo_${i}`,[.015,.19,.02],M.spectral);e.position.set(x,y,.22);c.torso.add(e);}
   return c.root;
 }
 const defs=[
@@ -150,9 +150,9 @@ for(const def of defs){
   model.userData={...model.userData,race:def.label,faction:def.faction,elementId:def.elementId,target:ART};
   model.updateMatrixWorld(true);
   const result=await exporter.parseAsync(model,{binary:true,onlyVisible:true,trs:true});
-  const filename=\`gauntlet_\${def.key}_v1.glb\`;
+  const filename=`gauntlet_${def.key}_v1.glb`;
   await fs.writeFile(path.join(OUT,filename),Buffer.from(result));
-  manifest.races.push({key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,url:\`/assets/races/\${filename}\`});
+  manifest.races.push({key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,url:`/assets/races/${filename}`});
 }
 await fs.writeFile(path.join(OUT,'manifest.json'),JSON.stringify(manifest,null,2));
-console.log(\`Generated \${defs.length} locked race GLBs -> \${OUT}\`);
+console.log(`Generated ${defs.length} locked race GLBs -> ${OUT}`);
