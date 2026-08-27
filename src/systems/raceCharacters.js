@@ -8,7 +8,7 @@ let manifestPromise=null;
 const cache=new Map();
 const clean=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
 
-function manifest(){return manifestPromise??=fetch(MANIFEST_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(\`race manifest \${r.status}\`);return r.json();});}
+function manifest(){return manifestPromise??=fetch(MANIFEST_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`race manifest ${r.status}`);return r.json();});}
 function load(url){if(!cache.has(url))cache.set(url,loader.loadAsync(url).catch(e=>{cache.delete(url);throw e;}));return cache.get(url);}
 function cloneScene(source){return source.clone(true);}
 function isInsideRace(mesh,layer){for(let p=mesh;p;p=p.parent)if(p===layer)return true;return false;}
@@ -54,9 +54,9 @@ export function installRaceCharacterSystem(heroRoot){
     const generation=++token;status.ready=false;status.error=null;
     try{
       const mf=await manifest(),entry=mf.races.find(r=>r.key===key)||mf.races.find(r=>r.key===mf.defaultRace);
-      if(!entry)throw new Error(\`Unknown race \${key}\`);
+      if(!entry)throw new Error(`Unknown race ${key}`);
       const gltf=await load(entry.url);if(generation!==token)return;
-      layer.clear();model=cloneScene(gltf.scene);model.name=\`RaceVisual:\${entry.label}\`;model.userData.raceCharacter=true;
+      layer.clear();model=cloneScene(gltf.scene);model.name=`RaceVisual:${entry.label}`;model.userData.raceCharacter=true;
       const report=tune(model);layer.add(model);pivots=capturePivots(model);
       status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.triangles=report.triangles;status.meshes=report.meshes;status.materials=report.materials;status.ready=true;
       localStorage.setItem('gauntlet.race',entry.key);
