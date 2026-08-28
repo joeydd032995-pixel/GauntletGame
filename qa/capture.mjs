@@ -53,6 +53,12 @@ try{
     mark(`${String(i+1).padStart(2,'0')}-race-${race}-1080p.png`);
   }
 
+  // Gameplay input is intentionally disabled while capture mode owns the camera.
+  // Leave capture mode before testing the actual hotkey/action event path.
+  await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.exit());
+  await page.evaluate(()=>window.__GAUNTLET_RACES__.setLodOverride?.('hero'));
+  await page.waitForTimeout(150);
+
   await page.keyboard.press('5');
   await page.waitForFunction(()=>window.__GAUNTLET_RACES__?.snapshot?.().current==='cairnborn');
   await page.click('[data-race="brinesworn"]');
@@ -71,7 +77,6 @@ try{
   await page.waitForTimeout(700);const guardBase=await pivotPose();await page.keyboard.press('3');await page.waitForTimeout(100);const guardPose=await pivotPose();
   if(!poseChanged(guardBase,guardPose,['upper_arm_L','upper_arm_R','forearm_L','forearm_R']))throw new Error('Guard rigid-part articulation did not move required pivots');
 
-  await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.exit());
   await page.evaluate(()=>window.__GAUNTLET_RACES__.setLodOverride?.(null));
   await page.mouse.click(960,540);await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('06-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
   await page.keyboard.press('1');await page.waitForTimeout(140);mark('07-melee-impact-1080p.png');await page.waitForTimeout(480);
