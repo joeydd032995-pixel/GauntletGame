@@ -86,7 +86,7 @@ function update(dt){
   heroShadow.update(hero.position,heightFn,.9);enemyShadow.update(enemy.position,heightFn,1.15);enemyShadow.mesh.visible=enemyHp>0;
   const combat=!capture.active&&enemyHp>0&&hero.position.distanceTo(enemy.position)<16?1:0;audio.setCombatIntensity(combat,dt);rendering.update(dt,{combat,darkness:capture.active&&capture.neutral?.28:.58});lights.fill.position.lerp(hero.position.clone().add(new THREE.Vector3(0,6,4)),1-Math.exp(-dt*2));
   if(!capture.active){cameraRig.yaw=yaw;cameraRig.update(dt,{player:hero.position,target:enemyHp>0?enemy.position:null,combat:!!combat,impulse:vfx.impulse});}
-  updateProductionCharacterLOD(hero,camera);updateProductionCharacterLOD(enemy,camera);raceSystem.update(dt,heroAnim.state,Math.hypot(heroBody.velocity.x,heroBody.velocity.z));syncRaceHud();updateHud(keys.has('ShiftLeft'),combat);
+  updateProductionCharacterLOD(hero,camera);updateProductionCharacterLOD(enemy,camera);raceSystem.update(dt,heroAnim.state,Math.hypot(heroBody.velocity.x,heroBody.velocity.z),camera.position.distanceTo(hero.position));syncRaceHud();updateHud(keys.has('ShiftLeft'),combat);
   window.__GAUNTLET_METRICS__={heroAnimation:heroAnim.getTelemetry(),enemyAnimation:enemyAnim.getTelemetry(),capture:capture.snapshot(),race:raceSystem.snapshot(),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries}};
 }
 
