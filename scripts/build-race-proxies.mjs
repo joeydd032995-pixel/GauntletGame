@@ -15,144 +15,190 @@ const OUT=path.resolve('public/assets/races');
 await fs.mkdir(OUT,{recursive:true});
 const exporter=new GLTFExporter();
 const ART='premium refined OSRS/07Scape';
+const GENERATOR_VERSION='2.0.0-production-rigid';
 const deg=THREE.MathUtils.degToRad;
+
+const REQUIRED_PARTS=['pelvis','torso','chest_band','abdomen','head','crest','shoulder_L','shoulder_R','arm_L','arm_R','upper_arm_L','upper_arm_R','forearm_L','forearm_R','hand_L','hand_R','hip_L','hip_R','thigh_L','thigh_R','shin_L','shin_R','foot_L','foot_R','belt'];
+const LODS={
+  hero:{radial:18,sphere:2,segments:3,detail:1,scale:1},
+  mid:{radial:11,sphere:1,segments:2,detail:.72,scale:1},
+  far:{radial:7,sphere:1,segments:1,detail:.42,scale:1}
+};
 
 function mat(name,color,{metalness=0,roughness=.86,emissive=0,emissiveIntensity=0}={}){
   return new THREE.MeshStandardMaterial({name,color,metalness,roughness,flatShading:true,emissive,emissiveIntensity});
 }
-function shadow(mesh,name){mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;return mesh;}
-function mesh(geometry,material,name){return shadow(new THREE.Mesh(geometry,material),name);}
-function sphere(name,scale,material,segments=1){
-  const g=new THREE.IcosahedronGeometry(1,segments),m=mesh(g,material,name);m.scale.set(...scale);return m;
+function shadow(o,name){o.name=name;o.castShadow=true;o.receiveShadow=true;return o;}
+function mesh(g,m,name){return shadow(new THREE.Mesh(g,m),name);}
+function ico(name,scale,material,detail=1){const o=mesh(new THREE.IcosahedronGeometry(1,detail),material,name);o.scale.set(...scale);return o;}
+function cyl(name,rTop,rBottom,length,material,radial=10,heightSegments=1){return mesh(new THREE.CylinderGeometry(rTop,rBottom,length,radial,heightSegments,false),material,name);}
+function cone(name,radius,length,material,radial=8){return mesh(new THREE.ConeGeometry(radius,length,radial,1,false),material,name);}
+function box(name,size,material,segments=1){return mesh(new THREE.BoxGeometry(size[0],size[1],size[2],segments,segments,segments),material,name);}
+function plate(name,w,h,d,material,radial=8){const o=mesh(new THREE.CylinderGeometry(.5,.46,d,radial,1,false),material,name);o.rotation.x=Math.PI/2;o.scale.set(w,h,1);return o;}
+function wedge(name,w,h,d,material){const g=new THREE.BufferGeometry();const x=w/2,y=h/2,z=d/2;g.setAttribute('position',new THREE.Float32BufferAttribute([-x,-y,-z,x,-y,-z,x,-y,z,-x,-y,z,-x,y,0,x,y,0],3));g.setIndex([0,1,2,0,2,3,0,4,5,0,5,1,3,2,5,3,5,4,0,3,4,1,5,2]);g.computeVertexNormals();return mesh(g,material,name);}
+function fin(name,side,material,thickness=.025){const g=new THREE.BufferGeometry();const s=side;g.setAttribute('position',new THREE.Float32BufferAttribute([0,.12,-thickness, .23*s,0,-thickness, 0,-.12,-thickness, 0,.12,thickness, .23*s,0,thickness, 0,-.12,thickness],3));g.setIndex([0,1,2,3,5,4,0,3,4,0,4,1,1,4,5,1,5,2,2,5,3,2,3,0]);g.computeVertexNormals();return mesh(g,material,name);}
+function membrane(name,side,material,scale=1){const s=side;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,.18,0,.36*s,.09,.015,.33*s,-.12,.03,.08*s,-.18,.015,0,.18,.035,.36*s,.09,.05,.33*s,-.12,.065,.08*s,-.18,.05],3));g.setIndex([0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]);g.computeVertexNormals();const o=mesh(g,material,name);o.scale.setScalar(scale);return o;}
+function add(parent,obj,pos=[0,0,0],rot=[0,0,0]){obj.position.set(...pos);obj.rotation.set(...rot);parent.add(obj);return obj;}
+function group(parent,name,pos=[0,0,0]){const g=new THREE.Group();g.name=name;g.position.set(...pos);parent.add(g);return g;}
+
+function createMaterials(key){
+  if(key==='cairnborn') return {
+    skin:mat('basalt',0x59635f,{roughness:.98}),cloth:mat('bastion_cloth',0x33423f,{roughness:.93}),leather:mat('earth_leather',0x4a3727,{roughness:.9}),
+    primary:mat('slate_plate',0x788078,{roughness:.96}),secondary:mat('granite_edge',0x4a5552,{roughness:.94}),metal:mat('bronze_inlay',0x9a793e,{metalness:.48,roughness:.48}),accent:mat('ancestral_rune',0x62d5ca,{roughness:.32,emissive:0x1d7772,emissiveIntensity:.68}),tertiary:mat('lichen',0x65724d,{roughness:1})};
+  if(key==='brinesworn') return {
+    skin:mat('brinesworn_skin',0x75a39f,{roughness:.78}),cloth:mat('tide_cloth',0x29494e,{roughness:.9}),leather:mat('weathered_leather',0x5b4530,{roughness:.91}),
+    primary:mat('salt_steel',0x7d8d8c,{metalness:.38,roughness:.55}),secondary:mat('shell_mineral',0xa7a78e,{roughness:.82}),metal:mat('navigation_brass',0x90764c,{metalness:.42,roughness:.5}),accent:mat('sea_glass',0x8bd5ce,{roughness:.25,emissive:0x235b59,emissiveIntensity:.38}),tertiary:mat('coral',0xb36e64,{roughness:.86})};
+  if(key==='myceliad') return {
+    skin:mat('fungal_skin',0xa99b78,{roughness:.98}),cloth:mat('root_fiber',0x596047,{roughness:.97}),leather:mat('bark',0x49392b,{roughness:.98}),
+    primary:mat('cap',0x8d4d45,{roughness:.94}),secondary:mat('cap_gills',0xc6b68e,{roughness:.99}),metal:mat('mineral_nodule',0x7e775f,{roughness:.9}),accent:mat('spore_glow',0x8ec6b1,{roughness:.38,emissive:0x285447,emissiveIntensity:.48}),tertiary:mat('moss_growth',0x65734d,{roughness:1})};
+  if(key==='veylkin') return {
+    skin:mat('veylkin_skin',0xc5b7a8,{roughness:.88}),cloth:mat('veilcloth',0x44434f,{roughness:.94}),leather:mat('bark_leather',0x4d4030,{roughness:.93}),
+    primary:mat('moth_mantle',0x80738d,{roughness:.96}),secondary:mat('vestigial_membrane',0x9a8da3,{roughness:.9}),metal:mat('moon_metal',0x889b90,{metalness:.36,roughness:.48}),accent:mat('luminous_eye',0xc1e4d3,{roughness:.2,emissive:0x456f5f,emissiveIntensity:.72}),tertiary:mat('crest_powder',0x716779,{roughness:.98})};
+  return {
+    skin:mat('echoed_skin',0xb8a99f,{roughness:.85}),cloth:mat('neutral_cloth',0x4b5057,{roughness:.91}),leather:mat('mixed_leather',0x493c2f,{roughness:.9}),
+    primary:mat('bastion_fragment',0x8e8067,{metalness:.34,roughness:.55}),secondary:mat('verdant_fiber',0x5b7158,{roughness:.96}),metal:mat('impossible_relic',0x9b83aa,{metalness:.2,roughness:.42}),accent:mat('spectral_relic',0x7ba6c1,{roughness:.28,emissive:0x284b64,emissiveIntensity:.65}),tertiary:mat('lost_civilization_cloth',0x665b6e,{roughness:.9})};
 }
-function box(name,size,material){return mesh(new THREE.BoxGeometry(...size),material,name);}
-function cyl(name,radius,length,material,radial=8){return mesh(new THREE.CylinderGeometry(radius,radius,length,radial,1,false),material,name);}
-function cone(name,radius,length,material,radial=7){return mesh(new THREE.ConeGeometry(radius,length,radial,1,false),material,name);}
-function fin(name,side,material){
-  const x=.16*side;
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,x,.08,0,x,-.08,0],3));
-  g.setIndex([0,1,2]);g.computeVertexNormals();
-  return mesh(g,material,name);
-}
-function membrane(name,side,material){
-  const g=new THREE.BufferGeometry();
-  const s=side;
-  g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,.34*s,.12,.02,.28*s,-.13,.04,.08*s,-.08,.02],3));
-  g.setIndex([0,1,2,0,2,3]);g.computeVertexNormals();
-  return mesh(g,material,name);
-}
-function makeHumanoid({name,height=1.82,shoulder=.42,hip=.29,skin,cloth,leather,headScale=1,bulk=1}){
-  const root=new THREE.Group();root.name=name;root.userData.gauntletRaceProxy=true;
-  const scale=height/1.82;
-  const pelvis=new THREE.Group();pelvis.name='pelvis';pelvis.position.y=.91*scale;root.add(pelvis);
-  const pelvisMesh=sphere('pelvis_mesh',[hip*bulk,.19,.18],leather,1);pelvis.add(pelvisMesh);
 
-  const torso=new THREE.Group();torso.name='torso';torso.position.y=1.27*scale;root.add(torso);
-  const torsoMesh=sphere('torso_mesh',[shoulder*bulk,.22,.35*bulk],cloth,1);torso.add(torsoMesh);
+function makeRig(def,lod,M){
+  const q=LODS[lod],scale=def.height/1.82;
+  const root=new THREE.Group();root.name=def.label;root.userData={gauntletRaceProxy:true,lod};
+  const pelvis=group(root,'pelvis',[0,.93*scale,0]);
+  const abdomen=group(root,'abdomen',[0,.16*scale,0]);
+  const torso=group(root,'torso',[0,.23*scale,0]);
+  const chestBand=group(torso,'chest_band',[0,.08*scale,0]);
+  const belt=group(pelvis,'belt',[0,.02*scale,0]);
+  add(pelvis,ico('pelvis_mass',[def.hip*.98,.19,.18],M.leather,q.sphere));
+  add(abdomen,ico('abdomen_mass',[def.waist,.18,.23],M.cloth,q.sphere));
+  add(torso,ico('torso_mass',[def.shoulder,.25,.34],M.cloth,q.sphere));
+  add(chestBand,plate('chest_band_plate',def.shoulder*1.45,.24,.055,M.primary,Math.max(7,q.radial/2)),[0,.02,-.285]);
+  for(let i=0;i<Math.ceil(3*q.detail);i++) add(belt,box(`belt_segment_${i}`,[.13,.075,.07],i%2?M.metal:M.leather,1),[(i-1)*.13,0,-.19]);
 
-  const neck=new THREE.Group();neck.name='neck';neck.position.y=.30*scale;torso.add(neck);
-  const neckMesh=cyl('neck_mesh',.065*bulk,.12*scale,skin,8);neckMesh.position.y=.06*scale;neck.add(neckMesh);
+  const neck=group(torso,'neck',[0,.31*scale,0]);
+  add(neck,cyl('neck_mesh',.075,.068,.13*scale,M.skin,q.radial,1),[0,.065*scale,0]);
+  const head=group(neck,'head',[0,.13*scale,0]);
+  add(head,ico('head_mass',[.15*def.headScale,.14*def.headScale,.19*def.headScale],M.skin,q.sphere),[0,.15*scale,0]);
+  const crest=group(head,'crest',[0,.30*scale,0]);
 
-  const head=new THREE.Group();head.name='head';head.position.y=.18*scale;neck.add(head);
-  const headMesh=sphere('head_mesh',[.145*headScale,.135*headScale,.18*headScale],skin,1);headMesh.position.y=.14*scale;head.add(headMesh);
-
-  const upperLen=.37*scale, foreLen=.34*scale;
+  const upperLen=.38*scale,foreLen=.34*scale;
   for(const [side,sgn] of [['L',-1],['R',1]]){
-    const upper=new THREE.Group();upper.name=`upper_arm_${side}`;upper.position.set(sgn*shoulder*.96*bulk,.16*scale,0);upper.rotation.z=deg(sgn*35);torso.add(upper);
-    const um=cyl(`upper_arm_${side}_mesh`,.075*bulk,upperLen,cloth,8);um.position.y=-upperLen/2;upper.add(um);
-    const fore=new THREE.Group();fore.name=`forearm_${side}`;fore.position.y=-upperLen;upper.add(fore);
-    const fm=cyl(`forearm_${side}_mesh`,.064*bulk,foreLen,skin,8);fm.position.y=-foreLen/2;fore.add(fm);
-    const hand=new THREE.Group();hand.name=`hand_${side}`;hand.position.y=-foreLen;fore.add(hand);
-    const hm=sphere(`hand_${side}_mesh`,[.06*bulk,.085*scale,.052*bulk],skin,1);hm.position.y=-.035*scale;hand.add(hm);
+    const shoulder=group(torso,`shoulder_${side}`,[sgn*def.shoulder*.92,.17*scale,0]);
+    add(shoulder,ico(`shoulder_${side}_mass`,[.12*def.bulk,.105,.12],M.primary,q.sphere));
+    const arm=group(shoulder,`arm_${side}`,[sgn*.02,-.03,0]);
+    const upper=group(arm,`upper_arm_${side}`,[0,0,0]);upper.rotation.z=deg(sgn*28);
+    add(upper,cyl(`upper_arm_${side}_mesh`,.085*def.bulk,.073*def.bulk,upperLen,M.cloth,q.radial,q.segments),[0,-upperLen/2,0]);
+    const fore=group(upper,`forearm_${side}`,[0,-upperLen,0]);
+    add(fore,cyl(`forearm_${side}_mesh`,.074*def.bulk,.058*def.bulk,foreLen,M.skin,q.radial,q.segments),[0,-foreLen/2,0]);
+    const hand=group(fore,`hand_${side}`,[0,-foreLen,0]);
+    add(hand,ico(`hand_${side}_mesh`,[.068*def.bulk,.09,.058],M.skin,q.sphere),[0,-.04*scale,0]);
   }
 
-  const thighLen=.42*scale, shinLen=.41*scale;
+  const thighLen=.43*scale,shinLen=.41*scale;
   for(const [side,sgn] of [['L',-1],['R',1]]){
-    const thigh=new THREE.Group();thigh.name=`thigh_${side}`;thigh.position.set(sgn*hip*.52*bulk,-.04*scale,0);pelvis.add(thigh);
-    const tm=cyl(`thigh_${side}_mesh`,.095*bulk,thighLen,cloth,8);tm.position.y=-thighLen/2;thigh.add(tm);
-    const shin=new THREE.Group();shin.name=`shin_${side}`;shin.position.y=-thighLen;thigh.add(shin);
-    const sm=cyl(`shin_${side}_mesh`,.078*bulk,shinLen,leather,8);sm.position.y=-shinLen/2;shin.add(sm);
-    const foot=new THREE.Group();foot.name=`foot_${side}`;foot.position.y=-shinLen;shin.add(foot);
-    const fm=box(`foot_${side}_mesh`,[.15*bulk,.09*scale,.27*scale],leather);fm.position.set(0,-.035*scale,.06*scale);foot.add(fm);
+    const hip=group(pelvis,`hip_${side}`,[sgn*def.hip*.54,-.04*scale,0]);
+    add(hip,ico(`hip_${side}_guard`,[.11*def.bulk,.10,.105],M.primary,q.sphere));
+    const thigh=group(hip,`thigh_${side}`,[0,-.01,0]);
+    add(thigh,cyl(`thigh_${side}_mesh`,.105*def.bulk,.086*def.bulk,thighLen,M.cloth,q.radial,q.segments),[0,-thighLen/2,0]);
+    const shin=group(thigh,`shin_${side}`,[0,-thighLen,0]);
+    add(shin,cyl(`shin_${side}_mesh`,.088*def.bulk,.067*def.bulk,shinLen,M.leather,q.radial,q.segments),[0,-shinLen/2,0]);
+    const foot=group(shin,`foot_${side}`,[0,-shinLen,0]);
+    add(foot,wedge(`foot_${side}_mesh`,.17*def.bulk,.115*scale,.30*scale,M.leather),[0,-.04*scale,.07*scale]);
   }
-  return {root,torso,pelvis,head,scale};
+  return {root,pelvis,abdomen,torso,chestBand,belt,head,crest,scale,q,M};
 }
-function addCairnborn(){
-  const M={skin:mat('basalt',0x606a65,{roughness:.96}),cloth:mat('bastion_cloth',0x394845),leather:mat('leather',0x4d3928),
-    slate:mat('slate',0x7b8177,{roughness:.98}),bronze:mat('bronze_inlay',0x9b7a3f,{metalness:.6,roughness:.42}),
-    rune:mat('rune',0x58c7c0,{roughness:.35,emissive:0x1d7772,emissiveIntensity:.7}),moss:mat('lichen',0x66724e,{roughness:1})};
-  const c=makeHumanoid({name:'Cairnborn',height:1.94,shoulder:.49,hip:.34,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:1.05,bulk:1.08});
-  const chest=box('ancestral_chest_plate',[.72,.33,.18],M.slate);chest.position.set(0,.02,-.08);c.torso.add(chest);
-  const face=box('faceplate',[.24,.21,.13],M.slate);face.position.set(0,.14,-.13);c.head.add(face);
-  const brow=box('brow_inlay',[.27,.045,.025],M.bronze);brow.position.set(0,.20,-.205);c.head.add(brow);
-  for(const x of [-.08,.08]){const r=box(`rune_${x<0?'L':'R'}`,[.018,.22,.022],M.rune);r.position.set(x,.01,-.18);c.torso.add(r);}
-  for(const [side,sgn] of [['L',-1],['R',1]]){const s=sphere(`shoulder_plate_${side}`,[.19,.12,.15],M.slate,1);s.position.set(sgn*.45,.16,0);c.torso.add(s);}
-  const crystal=cone('lichen_crystal',.05,.15,M.moss,6);crystal.position.set(-.2,.3,.08);c.torso.add(crystal);
-  return c.root;
+
+function decorateCairnborn(c,lod){const {torso,head,crest,M,q}=c;
+  add(torso,plate('ancestral_chest_plate',.76,.43,.10,M.primary,10),[0,.02,-.32]);
+  add(torso,plate('lower_slate_plate',.58,.28,.085,M.secondary,8),[0,-.17,-.29]);
+  add(head,plate('carved_faceplate',.31,.28,.085,M.primary,8),[0,.15,-.205]);
+  add(head,box('brow_inlay',[.29,.052,.035],M.metal,1),[0,.21,-.225]);
+  for(const x of [-.105,0,.105]) add(torso,box(`rune_channel_${x}`,[.024,.30,.028],M.accent,1),[x,.015,-.37]);
+  for(const [side,sgn] of [['L',-1],['R',1]]) add(torso,ico(`layered_pauldron_${side}`,[.20,.14,.17],M.primary,q.sphere),[sgn*.47,.17,0]);
+  if(lod!=='far'){
+    for(let i=0;i<4;i++) add(torso,plate(`slate_scale_${i}`,.19,.13,.035,i%2?M.secondary:M.primary,7),[(i-1.5)*.16,-.07+(i%2)*.08,-.355]);
+    add(crest,cone('replacement_stone_crystal',.065,.20,M.tertiary,8),[-.12,.06,.02],[0,0,deg(-15)]);
+  }
+  if(lod==='hero') for(let i=0;i<8;i++){const a=i/8*Math.PI*2;add(torso,box(`carved_edge_${i}`,[.035,.12,.035],i%2?M.metal:M.secondary,1),[Math.sin(a)*.31,.02+Math.cos(a)*.17,-.355]);}
 }
-function addBrinesworn(){
-  const M={skin:mat('brinesworn_skin',0x79a7a4,{roughness:.76}),cloth:mat('tide_cloth',0x2f4e52),leather:mat('weathered_leather',0x5b4632),
-    metal:mat('salt_steel',0x7e8c8f,{metalness:.52,roughness:.5}),pearl:mat('pearl',0xd8d0b4,{roughness:.35}),coral:mat('coral',0xb06f67)};
-  const c=makeHumanoid({name:'Brinesworn',height:1.87,shoulder:.41,hip:.28,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.98});
-  for(const [side,sgn] of [['L',-1],['R',1]]){const f=fin(`ear_fin_${side}`,sgn,M.coral);f.position.set(sgn*.14,.14,0);f.rotation.x=deg(90);c.head.add(f);
-    const p=sphere(`naval_pauldron_${side}`,[.15,.09,.12],M.metal,1);p.position.set(sgn*.4,.16,0);c.torso.add(p);}
-  const h1=box('harness_L',[.07,.58,.05],M.leather);h1.position.set(-.13,0,-.21);h1.rotation.z=deg(-16);c.torso.add(h1);
-  const h2=box('harness_R',[.07,.58,.05],M.leather);h2.position.set(.13,0,-.21);h2.rotation.z=deg(16);c.torso.add(h2);
-  const pearl=sphere('tide_pearl',[.04,.04,.04],M.pearl,1);pearl.position.set(-.09,.20,-.16);c.head.add(pearl);
-  return c.root;
+function decorateBrinesworn(c,lod){const {torso,head,crest,M,q}=c;
+  for(const [side,sgn] of [['L',-1],['R',1]]){
+    add(head,fin(`fin_ear_${side}`,sgn,M.tertiary,lod==='hero'?.032:.024),[sgn*.145,.15,0]);
+    add(torso,ico(`shell_pauldron_${side}`,[.18,.11,.15],M.secondary,q.sphere),[sgn*.42,.17,0]);
+    if(lod!=='far') for(let i=0;i<3;i++) add(torso,plate(`mineral_ridge_${side}_${i}`,.13,.065,.035,M.primary,7),[sgn*(.23+i*.045),.12-i*.12,-.30],[0,0,deg(sgn*(12+i*4))]);
+  }
+  add(torso,box('harness_L',[.07,.62,.052],M.leather,1),[-.14,0,-.35],[0,0,deg(-17)]);add(torso,box('harness_R',[.07,.62,.052],M.leather,1),[.14,0,-.35],[0,0,deg(17)]);
+  add(head,ico('sea_glass_eye_L',[.035,.045,.025],M.accent,q.sphere),[-.055,.17,-.175]);add(head,ico('sea_glass_eye_R',[.035,.045,.025],M.accent,q.sphere),[.055,.17,-.175]);
+  add(crest,plate('navigation_circlet',.29,.08,.03,M.metal,8),[0,-.09,-.10]);
+  if(lod==='hero') for(let i=0;i<6;i++) add(torso,ico(`salt_nodule_${i}`,[.035,.025,.026],i%2?M.secondary:M.accent,1),[-.22+i*.09,-.18+(i%2)*.08,-.34]);
 }
-function addMyceliad(){
-  const M={skin:mat('fungal_skin',0xa99d7b,{roughness:.98}),cloth:mat('root_fiber',0x5c6247,{roughness:.96}),leather:mat('bark',0x493a2c,{roughness:.95}),
-    cap:mat('cap',0x8e4e46,{roughness:.94}),gills:mat('cap_gills',0xc4b28e,{roughness:.98}),spore:mat('spore',0x88b7a4,{roughness:.4,emissive:0x264f45,emissiveIntensity:.45})};
-  const c=makeHumanoid({name:'Myceliad',height:1.79,shoulder:.42,hip:.31,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.9});
-  const cap=sphere('mushroom_crown',[.35,.11,.30],M.cap,2);cap.position.set(0,.34,0);c.head.add(cap);
-  const g=sphere('mushroom_gills',[.25,.055,.22],M.gills,1);g.position.set(0,.27,0);c.head.add(g);
-  for(const [side,sgn] of [['L',-1],['R',1]]){const shelf=sphere(`shelf_${side}`,[.19,.055,.14],M.gills,1);shelf.position.set(sgn*.40,.17,0);c.torso.add(shelf);}
-  const chest=sphere('grown_chest_plate',[.35,.27,.23],M.leather,1);chest.position.set(0,.01,-.02);c.torso.add(chest);
-  for(const [i,x] of [[0,-.16],[1,.16]]){const sp=sphere(`spore_${i}`,[.025,.025,.025],M.spore,1);sp.position.set(x,.08,-.24);c.torso.add(sp);}
-  return c.root;
+function decorateMyceliad(c,lod){const {torso,head,crest,M,q}=c;
+  add(crest,ico('mushroom_crown',[.40,.12,.34],M.primary,q.sphere),[0,.08,0]);
+  add(crest,ico('mushroom_gills',[.33,.065,.28],M.secondary,q.sphere),[0,.005,0]);
+  add(torso,ico('grown_chest_plate',[.36,.27,.25],M.leather,q.sphere),[0,.01,-.04]);
+  for(const [side,sgn] of [['L',-1],['R',1]]) add(torso,ico(`shelf_fungus_${side}`,[.20,.06,.15],M.secondary,q.sphere),[sgn*.39,.18,.03],[0,0,deg(sgn*8)]);
+  if(lod!=='far'){
+    for(let i=0;i<5;i++){const s=i%2?-1:1;add(torso,cone(`root_spur_${i}`,.045,.20,M.leather,7),[s*(.20+i*.025),-.18+i*.08,.05],[0,0,deg(s*35)]);}
+    for(let i=0;i<4;i++) add(torso,ico(`spore_node_${i}`,[.03,.03,.03],M.accent,1),[-.16+i*.11,.05+(i%2)*.09,-.31]);
+  }
+  if(lod==='hero') for(let i=0;i<8;i++){const a=i/8*Math.PI*2;add(crest,plate(`gill_lamella_${i}`,.11,.035,.018,M.secondary,6),[Math.cos(a)*.22,.01,Math.sin(a)*.16],[0,a,0]);}
 }
-function addVeylkin(){
-  const M={skin:mat('veylkin_skin',0xc6b9aa,{roughness:.88}),cloth:mat('veilcloth',0x484653,{roughness:.93}),leather:mat('bark_leather',0x514433),
-    moon:mat('moon_metal',0x8b9c91,{metalness:.42,roughness:.45}),mantle:mat('moth_mantle',0x81758e,{roughness:.96}),
-    eye:mat('luminous_eye',0xbbd9c8,{roughness:.25,emissive:0x42685b,emissiveIntensity:.7}),mem:mat('vestigial_membrane',0x9a8ea3,{roughness:.94})};
-  const c=makeHumanoid({name:'Veylkin',height:1.91,shoulder:.39,hip:.27,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:1.0});
-  for(const [side,sgn] of [['L',-1],['R',1]]){const e=sphere(`eye_${side}`,[.035,.045,.024],M.eye,1);e.position.set(sgn*.055,.15,-.13);c.head.add(e);
-    const crest=new THREE.Group();crest.name=`sensory_crest_${side}`;crest.position.set(sgn*.06,.28,0);crest.rotation.z=deg(-sgn*28);c.head.add(crest);
-    const stalk=cyl(`sensory_crest_${side}_mesh`,.012,.30,M.mantle,6);stalk.position.y=.15;crest.add(stalk);
-    const w=membrane(`mantle_${side}`,sgn,M.mantle);w.position.set(sgn*.08,.16,.02);c.torso.add(w);
-    const back=membrane(`vestigial_membrane_${side}`,sgn,M.mem);back.scale.set(.55,1.15,1);back.position.set(sgn*.05,.07,.16);c.torso.add(back);}
-  return c.root;
+function decorateVeylkin(c,lod){const {torso,head,crest,M,q}=c;
+  for(const [side,sgn] of [['L',-1],['R',1]]){
+    add(head,ico(`luminous_eye_${side}`,[.036,.045,.025],M.accent,q.sphere),[sgn*.055,.17,-.175]);
+    const stalk=group(crest,`sensory_crest_${side}`,[sgn*.06,-.02,0]);stalk.rotation.z=deg(-sgn*25);add(stalk,cyl(`sensory_crest_${side}_mesh`,.016,.022,.34,M.tertiary,Math.max(6,q.radial/2),1),[0,.17,0]);add(stalk,ico(`crest_tip_${side}`,[.04,.055,.04],M.accent,q.sphere),[0,.35,0]);
+    add(torso,membrane(`moth_mantle_${side}`,sgn,M.primary,lod==='hero'?1.12:.92),[sgn*.05,.17,.01]);
+    add(torso,membrane(`vestigial_membrane_${side}`,sgn,M.secondary,lod==='hero'?.82:.62),[sgn*.03,.03,.16],[0,0,deg(sgn*8)]);
+    add(torso,ico(`mantle_anchor_${side}`,[.14,.09,.13],M.primary,q.sphere),[sgn*.39,.19,0]);
+  }
+  add(torso,plate('moon_chest_clasp',.20,.12,.045,M.metal,8),[0,.16,-.34]);
+  if(lod==='hero') for(let i=0;i<6;i++) add(torso,plate(`powder_mark_${i}`,.06,.035,.012,M.tertiary,6),[-.15+i*.06,-.12+(i%2)*.09,-.355]);
 }
-function addEchoed(){
-  const M={skin:mat('echoed_skin',0xb9aaa0,{roughness:.84}),cloth:mat('neutral_cloth',0x4e5258),leather:mat('mixed_leather',0x4a3d30),
-    bastion:mat('bastion_plate',0x8e8067,{metalness:.48,roughness:.5}),verdant:mat('verdant_fiber',0x5c7159,{roughness:.96}),
-    spectral:mat('spectral_relic',0x789fba,{roughness:.3,emissive:0x274860,emissiveIntensity:.65}),relic:mat('impossible_relic',0x9b83aa,{metalness:.22,roughness:.4})};
-  const c=makeHumanoid({name:'Echoed',height:1.83,shoulder:.43,hip:.29,skin:M.skin,cloth:M.cloth,leather:M.leather,headScale:.98});
-  const bp=box('bastion_shoulder',[.22,.18,.18],M.bastion);bp.position.set(-.32,.16,0);c.torso.add(bp);
-  const vp=sphere('verdant_shoulder',[.17,.09,.13],M.verdant,1);vp.position.set(.32,.16,0);c.torso.add(vp);
-  for(const [i,[x,y]] of [[0,[-.14,.06]],[1,[.12,.21]]]){const r=cone(`relic_${i}`,.035,.13,M.relic,6);r.position.set(x,y,-.22);c.torso.add(r);}
-  const iris=sphere('asymmetrical_iris',[.035,.028,.018],M.spectral,1);iris.position.set(.045,.15,-.14);c.head.add(iris);
-  for(const [i,[x,y]] of [[0,[-.04,.14]],[1,[.11,-.04]]]){const e=box(`timeline_echo_${i}`,[.015,.19,.02],M.spectral);e.position.set(x,y,.22);c.torso.add(e);}
-  return c.root;
+function decorateEchoed(c,lod){const {torso,head,crest,M,q}=c;
+  add(torso,plate('bastion_shoulder_fragment',.28,.24,.09,M.primary,8),[-.32,.16,-.06],[0,0,deg(-8)]);
+  add(torso,ico('verdant_shoulder_growth',[.19,.11,.15],M.secondary,q.sphere),[.34,.17,.02]);
+  add(head,ico('asymmetrical_iris',[.038,.032,.021],M.accent,q.sphere),[.05,.17,-.18]);
+  for(let i=0;i<3;i++) add(torso,cone(`impossible_relic_${i}`,.045,.18+i*.025,M.metal,7),[-.17+i*.16,.03+i*.08,-.34],[deg(12*i),0,deg(-18+18*i)]);
+  add(crest,plate('lost_civilization_diadem',.27,.09,.035,M.tertiary,8),[0,-.05,-.10]);
+  if(lod!=='far') for(let i=0;i<4;i++) add(torso,box(`timeline_displacement_${i}`,[.018,.20-.02*i,.028],M.accent,1),[-.15+i*.10,-.10+i*.08,.25]);
+  if(lod==='hero'){
+    const echoMat=M.accent.clone();echoMat.name='second_possibility_echo';echoMat.transparent=true;echoMat.opacity=.22;echoMat.depthWrite=false;
+    add(torso,ico('duplicate_silhouette_shard',[.27,.24,.08],echoMat,2),[.045,.02,.18],[0,deg(8),deg(4)]);
+    for(let i=0;i<6;i++) add(torso,plate(`fracture_token_${i}`,.07,.05,.018,i%2?M.metal:M.accent,6),[-.18+i*.07,.20-(i%3)*.12,-.36]);
+  }
 }
+
 const defs=[
-  {key:'cairnborn',label:'Cairnborn',faction:'Bastion Compact',elementId:'579defc6-18d2-4dd7-83ff-6d23a51f31fe',height:1.94,build:addCairnborn},
-  {key:'brinesworn',label:'Brinesworn',faction:'Bastion Compact',elementId:'d504b1e4-275d-4ccc-a07f-ab61bcc6848d',height:1.87,build:addBrinesworn},
-  {key:'myceliad',label:'Myceliad',faction:'Verdant Oath',elementId:'d9b6f30a-fa51-47c4-b22c-70ed66c07081',height:1.79,build:addMyceliad},
-  {key:'veylkin',label:'Veylkin',faction:'Verdant Oath',elementId:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',height:1.91,build:addVeylkin},
-  {key:'echoed',label:'Echoed',faction:'Neutral / Chosen',elementId:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db',height:1.83,build:addEchoed}
+  {key:'cairnborn',label:'Cairnborn',faction:'Bastion Compact',elementId:'579defc6-18d2-4dd7-83ff-6d23a51f31fe',height:1.94,shoulder:.49,waist:.28,hip:.34,headScale:1.05,bulk:1.10,decorate:decorateCairnborn,silhouetteNotes:'Broad memorial-stone frame, layered slate armor, carved faceplate and ancestral rune channels.'},
+  {key:'brinesworn',label:'Brinesworn',faction:'Bastion Compact',elementId:'d504b1e4-275d-4ccc-a07f-ab61bcc6848d',height:1.87,shoulder:.41,waist:.245,hip:.28,headScale:.98,bulk:.94,decorate:decorateBrinesworn,silhouetteNotes:'Tall coastal humanoid, narrow waist, mineral ridges, fin ears and shell-shoulder navigation gear.'},
+  {key:'myceliad',label:'Myceliad',faction:'Verdant Oath',elementId:'d9b6f30a-fa51-47c4-b22c-70ed66c07081',height:1.79,shoulder:.42,waist:.29,hip:.31,headScale:.90,bulk:1.02,decorate:decorateMyceliad,silhouetteNotes:'Root-limbed fungal humanoid with broad mushroom crown, readable gills and asymmetric grown armor.'},
+  {key:'veylkin',label:'Veylkin',faction:'Verdant Oath',elementId:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',height:1.91,shoulder:.39,waist:.235,hip:.27,headScale:1.00,bulk:.90,decorate:decorateVeylkin,silhouetteNotes:'Tall narrow nocturnal frame with sensory crests, moth mantle and restrained vestigial membranes.'},
+  {key:'echoed',label:'Echoed',faction:'Neutral / Chosen',elementId:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db',height:1.83,shoulder:.43,waist:.26,hip:.29,headScale:.98,bulk:.98,decorate:decorateEchoed,silhouetteNotes:'Deliberately asymmetric timeline-displaced humanoid with mismatched faction forms and spectral relic shards.'}
 ];
-const manifest={schemaVersion:1,target:ART,source:'Higgsfield locked Character Elements',rigType:'articulated-rigid-part',productionMesh:false,defaultRace:'cairnborn',races:[]};
+
+function measure(root){let triangles=0,meshes=0;const materials=new Set();root.traverse(o=>{if(!o.isMesh)return;meshes++;const g=o.geometry;triangles+=Math.floor((g?.index?.count??g?.attributes?.position?.count??0)/3);for(const m of Array.isArray(o.material)?o.material:[o.material]) if(m?.name)materials.add(m.name);});return{triangles,meshes,materials:[...materials].sort()};}
+function validateParts(root,def,lod){const missing=REQUIRED_PARTS.filter(n=>!root.getObjectByName(n));if(missing.length)throw new Error(`${def.key}/${lod} missing pivots: ${missing.join(', ')}`);}
+async function exportGlb(root,filename){root.updateMatrixWorld(true);const result=await exporter.parseAsync(root,{binary:true,onlyVisible:true,trs:true});await fs.writeFile(path.join(OUT,filename),Buffer.from(result));}
+
+const manifest={schemaVersion:2,target:ART,source:'Higgsfield locked Character Elements',rigType:'articulated-rigid-part',productionMesh:false,defaultRace:'cairnborn',generatorVersion:GENERATOR_VERSION,lodDistances:{heroMax:11,midMax:24},races:[]};
 for(const def of defs){
-  const model=def.build();
-  model.userData={...model.userData,race:def.label,faction:def.faction,elementId:def.elementId,target:ART};
-  model.updateMatrixWorld(true);
-  const result=await exporter.parseAsync(model,{binary:true,onlyVisible:true,trs:true});
-  const filename=`gauntlet_${def.key}_v1.glb`;
-  await fs.writeFile(path.join(OUT,filename),Buffer.from(result));
-  manifest.races.push({key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,url:`/assets/races/${filename}`});
+  const record={key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,productionMesh:false,rigType:'articulated-rigid-part',generatorVersion:GENERATOR_VERSION,silhouetteNotes:def.silhouetteNotes,parts:[...REQUIRED_PARTS],triangles:{},meshes:{},materials:[]};
+  for(const lod of ['hero','mid','far']){
+    const M=createMaterials(def.key);const c=makeRig(def,lod,M);def.decorate(c,lod);const model=c.root;
+    model.userData={...model.userData,race:def.label,faction:def.faction,elementId:def.elementId,target:ART,rigType:'articulated-rigid-part',productionMesh:false,lod};
+    validateParts(model,def,lod);const stats=measure(model);
+    if(lod==='hero'&&stats.triangles<3000)throw new Error(`${def.key} hero below 3000 triangles: ${stats.triangles}`);
+    const suffix=lod==='hero'?'':`_${lod}`;const filename=`gauntlet_${def.key}${suffix}_v1.glb`;await exportGlb(model,filename);
+    record.triangles[lod]=stats.triangles;record.meshes[lod]=stats.meshes;if(lod==='hero')record.materials=stats.materials;
+    record[`${lod}Url`]=`/assets/races/${filename}`;
+  }
+  record.url=record.heroUrl;
+  manifest.races.push(record);
 }
-await fs.writeFile(path.join(OUT,'manifest.json'),JSON.stringify(manifest,null,2));
-console.log(`Generated ${defs.length} locked race GLBs -> ${OUT}`);
+
+if(manifest.races.length!==5)throw new Error(`Expected five races, got ${manifest.races.length}`);
+const expectedIds=new Map(defs.map(d=>[d.key,d.elementId]));
+for(const r of manifest.races){if(expectedIds.get(r.key)!==r.elementId)throw new Error(`Element ID drift for ${r.key}`);if(r.url!==r.heroUrl)throw new Error(`Legacy URL drift for ${r.key}`);}
+await fs.writeFile(path.join(OUT,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+await fs.writeFile(path.join(OUT,'README.md'),`# Gauntlet Race Assets\n\nGenerated deterministically with \`npm run assets:races\`.\n\n- Art target: ${ART}\n- Generator: ${GENERATOR_VERSION}\n- Rig type: articulated rigid-part (not a skinned production mesh)\n- LODs: hero, mid, far for all five races\n- Stable contract: race keys, Higgsfield Element IDs, canonical named pivots, manifest URLs\n\nFuture skinned replacements must preserve race identity, Element IDs, scale, and canonical pivot/bone mapping.\n`);
+console.log('Generated production-tier race LODs:');
+for(const r of manifest.races)console.log(`${r.label}: hero ${r.triangles.hero} | mid ${r.triangles.mid} | far ${r.triangles.far}`);
+console.log(`Output -> ${OUT}`);
