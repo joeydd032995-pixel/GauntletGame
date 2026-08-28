@@ -34,14 +34,26 @@ try{
   const environmentDetailReadyMs=Date.now()-navStart;
   const environmentDetail=await page.evaluate(()=>({groundDetail:JSON.parse(JSON.stringify(window.__GAUNTLET_GROUND_DETAIL__||null)),terrainMaterial:JSON.parse(JSON.stringify(window.__GAUNTLET_TERRAIN_MATERIAL__||null)),streamingEnvironment:JSON.parse(JSON.stringify(window.__GAUNTLET_STREAMING_ENVIRONMENT__||null))}));
   boot=await page.evaluate(({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,environmentDetail})=>({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,...environmentDetail,mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}),{domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,environmentDetail});
-  await page.waitForTimeout(900);mark('01-idle-1080p.png');
-  await page.mouse.click(960,540);await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('02-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
-  await page.keyboard.press('1');await page.waitForTimeout(140);mark('03-melee-impact-1080p.png');await page.waitForTimeout(480);
-  await page.keyboard.press('2');await page.waitForTimeout(110);mark('04-rift-vfx-1080p.png');await page.waitForTimeout(650);
-  await page.keyboard.press('Space');await page.waitForTimeout(140);mark('05-evade-1080p.png');await page.waitForTimeout(2200);metrics=await page.evaluate(()=>({runtime:window.__GAUNTLET_METRICS__||null,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null,groundDetail:window.__GAUNTLET_GROUND_DETAIL__||null,terrainMaterial:window.__GAUNTLET_TERRAIN_MATERIAL__||null,streamingEnvironment:window.__GAUNTLET_STREAMING_ENVIRONMENT__||null}));
+
+  // Dedicated runtime evidence for every locked player race. Each switch waits for
+  // the GLB to become the active rendered race before the frame timestamp is marked.
+  const races=['cairnborn','brinesworn','myceliad','veylkin','echoed'];
+  for(let i=0;i<races.length;i++){
+    const race=races[i];
+    await page.evaluate(r=>window.__GAUNTLET_RACES__?.setRace(r),race);
+    await page.waitForFunction(r=>window.__GAUNTLET_RACES__?.snapshot?.().ready===true&&window.__GAUNTLET_RACES__?.snapshot?.().current===r,race,{timeout:30000});
+    await page.waitForTimeout(700);
+    mark(`${String(i+1).padStart(2,'0')}-race-${race}-1080p.png`);
+  }
+
+  // Preserve gameplay-state evidence using the currently active Echoed model.
+  await page.mouse.click(960,540);await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('06-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
+  await page.keyboard.press('1');await page.waitForTimeout(140);mark('07-melee-impact-1080p.png');await page.waitForTimeout(480);
+  await page.keyboard.press('2');await page.waitForTimeout(110);mark('08-rift-vfx-1080p.png');await page.waitForTimeout(650);
+  await page.keyboard.press('Space');await page.waitForTimeout(140);mark('09-evade-1080p.png');await page.waitForTimeout(2200);metrics=await page.evaluate(()=>({runtime:window.__GAUNTLET_METRICS__||null,races:window.__GAUNTLET_RACES__?.snapshot?.()||null,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null,groundDetail:window.__GAUNTLET_GROUND_DETAIL__||null,terrainMaterial:window.__GAUNTLET_TERRAIN_MATERIAL__||null,streamingEnvironment:window.__GAUNTLET_STREAMING_ENVIRONMENT__||null}));
 }catch(e){
   fatal=e;errors.push(`capture: ${e.stack||e.message}`);
-  try{failureTelemetry=await page.evaluate(()=>({authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),environment:JSON.parse(JSON.stringify(window.__GAUNTLET_HYBRID_ENVIRONMENT__||null)),groundDetail:JSON.parse(JSON.stringify(window.__GAUNTLET_GROUND_DETAIL__||null)),terrainMaterial:JSON.parse(JSON.stringify(window.__GAUNTLET_TERRAIN_MATERIAL__||null)),streamingEnvironment:JSON.parse(JSON.stringify(window.__GAUNTLET_STREAMING_ENVIRONMENT__||null)),mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}));}catch(snapshotError){errors.push(`failure telemetry: ${snapshotError.message}`);}
+  try{failureTelemetry=await page.evaluate(()=>({races:window.__GAUNTLET_RACES__?.snapshot?.()||null,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),environment:JSON.parse(JSON.stringify(window.__GAUNTLET_HYBRID_ENVIRONMENT__||null)),groundDetail:JSON.parse(JSON.stringify(window.__GAUNTLET_GROUND_DETAIL__||null)),terrainMaterial:JSON.parse(JSON.stringify(window.__GAUNTLET_TERRAIN_MATERIAL__||null)),streamingEnvironment:JSON.parse(JSON.stringify(window.__GAUNTLET_STREAMING_ENVIRONMENT__||null)),mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}));}catch(snapshotError){errors.push(`failure telemetry: ${snapshotError.message}`);}
 }finally{await context.close().catch(()=>{});await browser.close().catch(()=>{});}
 
 async function findFfmpeg(){try{await exec('ffmpeg',['-version'],{timeout:3000});return'ffmpeg';}catch{}const root=path.join(os.homedir(),'.cache','ms-playwright');try{for(const dir of await fs.readdir(root)){if(!dir.startsWith('ffmpeg-'))continue;for(const name of['ffmpeg-linux','ffmpeg']){const candidate=path.join(root,dir,name);try{await fs.access(candidate);return candidate;}catch{}}}}catch{}throw new Error('Playwright FFmpeg binary not found');}
