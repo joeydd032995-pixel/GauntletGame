@@ -7,6 +7,7 @@ const loader=new GLTFLoader();
 let manifestPromise=null;
 const cache=new Map();
 const clean=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+const PIVOT_NAMES=['torso','head','upper_arm_L','upper_arm_R','forearm_L','forearm_R','thigh_L','thigh_R','shin_L','shin_R'];
 
 function manifest(){return manifestPromise??=fetch(MANIFEST_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`race manifest ${r.status}`);return r.json();});}
 function load(url){if(!cache.has(url))cache.set(url,loader.loadAsync(url).catch(e=>{cache.delete(url);throw e;}));return cache.get(url);}
@@ -20,10 +21,11 @@ function tune(root){
   });return{triangles,meshes,materials};
 }
 function capturePivots(root){
-  const names=['torso','head','upper_arm_L','upper_arm_R','forearm_L','forearm_R','thigh_L','thigh_R','shin_L','shin_R'];
-  const pivots={};for(const n of names){const o=root.getObjectByName(n);if(o)pivots[n]={o,base:o.rotation.clone()};}return pivots;
+  const pivots={};for(const n of PIVOT_NAMES){const o=root.getObjectByName(n);if(o)pivots[n]={o,base:o.rotation.clone()};}
+  const missing=PIVOT_NAMES.filter(n=>!pivots[n]);if(missing.length)throw new Error(`Race LOD missing animation pivots: ${missing.join(', ')}`);
+  return pivots;
 }
-function animate(pivots,state,speed,time,dt){
+function animate(pivots,state,speed,time){
   const set=(name,x=0,y=0,z=0)=>{const p=pivots[name];if(!p)return;p.o.rotation.set(p.base.x+x,p.base.y+y,p.base.z+z);};
   const move=Math.min(1,speed/5),freq=speed>6?11:7.5,gait=Math.sin(time*freq)*move;
   set('upper_arm_L', gait*.34,0,0);set('upper_arm_R',-gait*.34,0,0);
@@ -47,30 +49,44 @@ function requestedRace(){
 
 export function installRaceCharacterSystem(heroRoot){
   const layer=new THREE.Group();layer.name='GauntletRaceLayer';layer.userData.raceCharacterRoot=true;heroRoot.add(layer);
-  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,error:null,triangles:0,meshes:0,materials:0,productionMesh:false,rigType:'articulated-rigid-part'};
-  let model=null,pivots={},token=0,time=0;
+  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,error:null,triangles:0,heroTriangles:0,meshes:0,materials:0,productionMesh:false,rigType:'articulated-rigid-part',lod:'hero',lodReady:{hero:false,mid:false,far:false},lodError:null,lodDistances:{heroMax:11,midMax:24}};
+  let lodScenes={hero:null,mid:null,far:null},lodReports={hero:null,mid:null,far:null},activeLod='hero',pivots={},token=0,time=0,lodOverride=null;
+
+  function suppressLegacy(){
+    heroRoot.traverse(o=>{if(!o.isMesh)return;if(isInsideRace(o,layer)){o.userData.raceCharacter=true;}else{o.visible=false;o.userData.hiddenByRaceCharacter=true;}});
+  }
+  function activateLod(next){
+    const scene=lodScenes[next];if(!scene||next===activeLod)return false;
+    for(const [key,value] of Object.entries(lodScenes))if(value)value.visible=key===next;
+    activeLod=next;pivots=capturePivots(scene);const report=lodReports[next];
+    status.lod=next;status.triangles=report?.triangles||status.triangles;status.meshes=report?.meshes||status.meshes;status.materials=report?.materials||status.materials;
+    return true;
+  }
+  async function prepareLod(entry,lod,generation){
+    const field=`${lod}Url`,url=entry[field];if(!url)return;
+    try{
+      const gltf=await load(url);if(generation!==token)return;
+      const scene=cloneScene(gltf.scene);scene.name=`RaceVisual:${entry.label}:${lod}`;scene.userData.raceCharacter=true;scene.userData.lod=lod;scene.visible=lod==='hero';
+      const report=tune(scene);capturePivots(scene);lodScenes[lod]=scene;lodReports[lod]=report;layer.add(scene);status.lodReady[lod]=true;
+      if(lod==='hero'){activeLod='hero';pivots=capturePivots(scene);status.triangles=report.triangles;status.heroTriangles=report.triangles;status.meshes=report.meshes;status.materials=report.materials;}
+    }catch(error){if(generation!==token)return;if(lod==='hero')throw error;status.lodError=`${lod}: ${String(error?.message||error)}`;console.warn(`Race ${lod} LOD load failed`,error);}
+  }
   async function setRace(key){
     key=RACE_ORDER.includes(clean(key))?clean(key):key;
-    const generation=++token;status.ready=false;status.error=null;
+    const generation=++token;status.ready=false;status.error=null;status.lodError=null;status.lod='hero';status.lodReady={hero:false,mid:false,far:false};activeLod='hero';lodScenes={hero:null,mid:null,far:null};lodReports={hero:null,mid:null,far:null};pivots={};layer.clear();
     try{
-      const mf=await manifest(),entry=mf.races.find(r=>r.key===key)||mf.races.find(r=>r.key===mf.defaultRace);
-      if(!entry)throw new Error(`Unknown race ${key}`);
-      const gltf=await load(entry.url);if(generation!==token)return;
-      layer.clear();model=cloneScene(gltf.scene);model.name=`RaceVisual:${entry.label}`;model.userData.raceCharacter=true;
-      const report=tune(model);layer.add(model);pivots=capturePivots(model);
-      status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.triangles=report.triangles;status.meshes=report.meshes;status.materials=report.materials;status.ready=true;
-      localStorage.setItem('gauntlet.race',entry.key);
-      window.dispatchEvent(new CustomEvent('gauntlet-race-change',{detail:snapshot()}));
-      suppressLegacy();
+      const mf=await manifest(),entry=mf.races.find(r=>r.key===key)||mf.races.find(r=>r.key===mf.defaultRace);if(!entry)throw new Error(`Unknown race ${key}`);
+      status.lodDistances=mf.lodDistances||status.lodDistances;
+      const heroUrl=entry.heroUrl||entry.url;if(!heroUrl)throw new Error(`Race ${entry.key} has no hero URL`);
+      const heroEntry={...entry,heroUrl};await prepareLod(heroEntry,'hero',generation);if(generation!==token)return;
+      status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.ready=true;status.productionMesh=entry.productionMesh??false;status.rigType=entry.rigType||'articulated-rigid-part';
+      localStorage.setItem('gauntlet.race',entry.key);window.dispatchEvent(new CustomEvent('gauntlet-race-change',{detail:snapshot()}));suppressLegacy();
+      Promise.allSettled([prepareLod(entry,'mid',generation),prepareLod(entry,'far',generation)]).then(()=>{if(generation===token)window.dispatchEvent(new CustomEvent('gauntlet-race-lod-ready',{detail:snapshot()}));});
     }catch(error){status.error=String(error?.message||error);status.ready=false;console.error('Race character load failed',error);}
   }
-  function suppressLegacy(){
-    heroRoot.traverse(o=>{if(!o.isMesh)return;if(isInsideRace(o,layer)){o.visible=true;o.userData.raceCharacter=true;}else{o.visible=false;o.userData.hiddenByRaceCharacter=true;}});
-  }
-  function update(dt,state,speed){time+=dt;if(model&&status.ready){animate(pivots,state,speed,time,dt);suppressLegacy();}}
-  function snapshot(){return{...status,available:[...RACE_ORDER]};}
-  const api={setRace,update,snapshot,layer,status};
-  window.__GAUNTLET_RACES__=api;
-  setRace(requestedRace());
-  return api;
+  function desiredLod(distance){if(lodOverride)return lodOverride;const d=Math.max(0,Number(distance)||0),cuts=status.lodDistances||{};if(d<=(cuts.heroMax??11))return'hero';if(d<=(cuts.midMax??24))return'mid';return'far';}
+  function update(dt,state,speed,distance=0){time+=dt;if(!status.ready)return;const wanted=desiredLod(distance);if(lodScenes[wanted])activateLod(wanted);animate(pivots,state,speed,time);suppressLegacy();}
+  function snapshot(){return{...status,lodReady:{...status.lodReady},available:[...RACE_ORDER]};}
+  function setLodOverride(value=null){lodOverride=['hero','mid','far'].includes(value)?value:null;const wanted=desiredLod(0);if(lodScenes[wanted])activateLod(wanted);return snapshot();}
+  const api={setRace,update,snapshot,setLodOverride,layer,status};window.__GAUNTLET_RACES__=api;setRace(requestedRace());return api;
 }
