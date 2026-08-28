@@ -53,12 +53,9 @@ try{
     mark(`${String(i+1).padStart(2,'0')}-race-${race}-1080p.png`);
   }
 
-  // Gameplay input is intentionally disabled while capture mode owns the camera.
-  // Leave capture mode before testing the actual hotkey/action event path.
   await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.exit());
   await page.evaluate(()=>window.__GAUNTLET_RACES__.setLodOverride?.('hero'));
   await page.waitForTimeout(150);
-
   await page.keyboard.press('5');
   await page.waitForFunction(()=>window.__GAUNTLET_RACES__?.snapshot?.().current==='cairnborn');
   await page.click('[data-race="brinesworn"]');
@@ -97,7 +94,20 @@ async function findFfmpeg(){try{await exec('ffmpeg',['-version'],{timeout:3000})
 async function validFrame(file){try{const s=await fs.stat(file);return s.isFile()&&s.size>4096;}catch{return false;}}
 const videoFiles=(await fs.readdir('artifacts/video')).filter(f=>f.endsWith('.webm'));let extracted=0;
 if(videoFiles.length){const video=path.join('artifacts/video',videoFiles[0]);try{const ffmpeg=await findFfmpeg();for(let i=0;i<marks.length;i++){const[name,time]=marks[i],output=path.join('artifacts/frames',name),isTail=i===marks.length-1,seek=isTail?['-sseof','-0.35']:['-ss',time.toFixed(3)];try{await exec(ffmpeg,['-loglevel','error','-y',...seek,'-i',video,'-frames:v','1',output],{timeout:30000});if(await validFrame(output))extracted++;else errors.push(`frame ${name}: ffmpeg returned without a non-empty output file`);}catch(e){errors.push(`frame ${name}: ${e.stderr||e.message}`);}}if(extracted!==marks.length){errors.push(`capture: extracted ${extracted}/${marks.length} required evidence frames`);fatal=fatal||new Error('Incomplete rendered evidence set');}}catch(e){errors.push(`capture: ${e.message}`);fatal=fatal||e;}}else{errors.push('capture: no WebM video produced');fatal=fatal||new Error('No WebM video produced');}
-await fs.writeFile('artifacts/capture-marks.json',JSON.stringify({marks:Object.fromEntries(marks),extractedFrames:extracted,requiredFrames:marks.length,lastFrameSource:'video-tail'},null,2));
+
+const legacyAliases={
+  '01-idle-1080p.png':'01-race-cairnborn-1080p.png',
+  '02-locomotion-1080p.png':'06-locomotion-1080p.png',
+  '03-melee-impact-1080p.png':'07-melee-impact-1080p.png',
+  '04-rift-vfx-1080p.png':'08-rift-vfx-1080p.png',
+  '05-evade-1080p.png':'09-evade-1080p.png'
+};
+for(const [legacy,source] of Object.entries(legacyAliases)){
+  const sourcePath=path.join('artifacts/frames',source),legacyPath=path.join('artifacts/frames',legacy);
+  if(await validFrame(sourcePath))await fs.copyFile(sourcePath,legacyPath);else{errors.push(`legacy evidence alias ${legacy}: source ${source} missing`);fatal=fatal||new Error('Legacy environment evidence alias failed');}
+}
+
+await fs.writeFile('artifacts/capture-marks.json',JSON.stringify({marks:Object.fromEntries(marks),extractedFrames:extracted,requiredFrames:marks.length,lastFrameSource:'video-tail',legacyAliases},null,2));
 await fs.writeFile('artifacts/boot-metrics.json',JSON.stringify(boot||{status:'boot-unavailable'},null,2));
 await fs.writeFile('artifacts/render-metrics.json',JSON.stringify(metrics||{status:'metrics-unavailable'},null,2));
 if(failureTelemetry)await fs.writeFile('artifacts/failure-telemetry.json',JSON.stringify(failureTelemetry,null,2));
