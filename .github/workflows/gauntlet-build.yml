@@ -29,12 +29,31 @@ jobs:
           find dist/assets -type f | grep -q .
           test -f dist/assets/authored/character-source.json
           test -f dist/assets/races/manifest.json
-          test -f dist/assets/races/gauntlet_cairnborn_v1.glb
-          test -f dist/assets/races/gauntlet_brinesworn_v1.glb
-          test -f dist/assets/races/gauntlet_myceliad_v1.glb
-          test -f dist/assets/races/gauntlet_veylkin_v1.glb
-          test -f dist/assets/races/gauntlet_echoed_v1.glb
-          node -e "const p=require('./dist/assets/races/manifest.json'); if(p.target!=='premium refined OSRS/07Scape'||p.races?.length!==5) process.exit(1); const ids=new Set(p.races.map(r=>r.elementId)); for(const id of ['579defc6-18d2-4dd7-83ff-6d23a51f31fe','d504b1e4-275d-4ccc-a07f-ab61bcc6848d','d9b6f30a-fa51-47c4-b22c-70ed66c07081','57e790db-f7c4-4a5b-a0b1-ed66a1915314','09146293-fa83-4aef-b6e1-a3e1ee7dd6db']) if(!ids.has(id)) process.exit(1);"
+          for race in cairnborn brinesworn myceliad veylkin echoed; do
+            test -f "dist/assets/races/gauntlet_${race}_v1.glb"
+            test -f "dist/assets/races/gauntlet_${race}_mid_v1.glb"
+            test -f "dist/assets/races/gauntlet_${race}_far_v1.glb"
+          done
+          node - <<'NODE'
+          const p=require('./dist/assets/races/manifest.json');
+          const expected={
+            cairnborn:'579defc6-18d2-4dd7-83ff-6d23a51f31fe',
+            brinesworn:'d504b1e4-275d-4ccc-a07f-ab61bcc6848d',
+            myceliad:'d9b6f30a-fa51-47c4-b22c-70ed66c07081',
+            veylkin:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',
+            echoed:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db'
+          };
+          const required=['pelvis','torso','chest_band','abdomen','head','crest','shoulder_L','shoulder_R','arm_L','arm_R','upper_arm_L','upper_arm_R','forearm_L','forearm_R','hand_L','hand_R','hip_L','hip_R','thigh_L','thigh_R','shin_L','shin_R','foot_L','foot_R','belt'];
+          if(p.target!=='premium refined OSRS/07Scape'||p.races?.length!==5) process.exit(1);
+          for(const [key,id] of Object.entries(expected)){
+            const r=p.races.find(x=>x.key===key);
+            if(!r||r.elementId!==id||r.productionMesh!==false||r.rigType!=='articulated-rigid-part') process.exit(1);
+            if(r.url!==r.heroUrl||!r.midUrl||!r.farUrl) process.exit(1);
+            if((r.triangles?.hero||0)<3000||(r.triangles?.mid||0)<=0||(r.triangles?.far||0)<=0) process.exit(1);
+            for(const part of required) if(!r.parts?.includes(part)) process.exit(1);
+            if(!r.materials?.length||!r.silhouetteNotes||!r.generatorVersion) process.exit(1);
+          }
+          NODE
           test -f dist/assets/authored/quaternius-dressed/Male_Ranger.gltf
           test -f dist/assets/authored/quaternius-dressed/Male_Ranger.bin
           test -f dist/assets/authored/quaternius-dressed/Female_Ranger.gltf
