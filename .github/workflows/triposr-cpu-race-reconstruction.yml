@@ -1,0 +1,105 @@
+name: TripoSR CPU Race Reconstruction
+
+on:
+  push:
+    branches: ['sol/environment-gauntlet']
+    paths:
+      - '.github/workflows/triposr-cpu-race-reconstruction.yml'
+  workflow_dispatch:
+
+jobs:
+  reconstruct:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - race: cairnborn
+            apose: https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260827_215455_c34f5065-d202-4c95-a32a-c5355328bf05.png
+            element: 579defc6-18d2-4dd7-83ff-6d23a51f31fe
+          - race: brinesworn
+            apose: https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260827_215456_c32b1ea8-c18b-4a47-8016-136c7e29b9e7.png
+            element: d504b1e4-275d-4ccc-a07f-ab61bcc6848d
+          - race: myceliad
+            apose: https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260827_215455_1bd2383e-083e-49fd-bee8-431c70e32251.png
+            element: d9b6f30a-fa51-47c4-b22c-70ed66c07081
+          - race: veylkin
+            apose: https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260827_215455_8c56d46e-13e0-4720-b0b7-e72b3ca93be8.png
+            element: 57e790db-f7c4-4a5b-a0b1-ed66a1915314
+          - race: echoed
+            apose: https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260827_215455_91e42011-0230-4c39-81a8-0d4b751d60f5.png
+            element: 09146293-fa83-4aef-b6e1-a3e1ee7dd6db
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install CPU PyTorch
+        run: python -m pip install --disable-pip-version-check torch torchvision --index-url https://download.pytorch.org/whl/cpu
+      - name: Clone TripoSR
+        run: git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR.git /tmp/TripoSR
+      - name: Install TripoSR dependencies
+        run: python -m pip install --disable-pip-version-check -r /tmp/TripoSR/requirements.txt
+      - name: Acquire locked ${{ matrix.race }} A-pose
+        run: |
+          mkdir -p artifacts/triposr/${{ matrix.race }}
+          curl -fL --retry 4 --retry-delay 2 '${{ matrix.apose }}' -o artifacts/triposr/${{ matrix.race }}/reference-apose.png
+          python - <<'PY'
+          from PIL import Image
+          p='artifacts/triposr/${{ matrix.race }}/reference-apose.png'
+          im=Image.open(p)
+          print('reference', im.size, im.mode)
+          if min(im.size) < 1000:
+              raise SystemExit('reference unexpectedly low resolution')
+          PY
+      - name: Generate reference-driven GLB on CPU
+        run: |
+          python /tmp/TripoSR/run.py artifacts/triposr/${{ matrix.race }}/reference-apose.png \
+            --device cpu \
+            --chunk-size 2048 \
+            --mc-resolution 192 \
+            --foreground-ratio 0.85 \
+            --output-dir artifacts/triposr/${{ matrix.race }}/output \
+            --model-save-format glb
+          test -s artifacts/triposr/${{ matrix.race }}/output/0/mesh.glb
+          cp artifacts/triposr/${{ matrix.race }}/output/0/mesh.glb artifacts/triposr/${{ matrix.race }}/${{ matrix.race }}-triposr-candidate.glb
+      - name: Record strict acceptance provenance
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          race='${{ matrix.race }}'
+          p=pathlib.Path(f'artifacts/triposr/{race}/reconstruction.json')
+          glb=pathlib.Path(f'artifacts/triposr/{race}/{race}-triposr-candidate.glb')
+          data={
+            'race':race,
+            'provider':'TripoSR self-hosted CPU',
+            'sourceApose':'${{ matrix.apose }}',
+            'elementId':'${{ matrix.element }}',
+            'candidate':str(glb),
+            'candidateBytes':glb.stat().st_size,
+            'status':'GENERATED_UNACCEPTED',
+            'acceptance':{
+              'overallMin':97,
+              'categoryFloor':95,
+              'identityAnatomyMin':98,
+              'silhouetteProportionMin':97,
+              'criticalMissesAllowed':0,
+              'visualReviewRequired':True,
+              'technicalValidityDoesNotImplyAcceptance':True
+            }
+          }
+          p.write_text(json.dumps(data,indent=2))
+          print(json.dumps(data,indent=2))
+          PY
+      - name: Upload ${{ matrix.race }} candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: triposr-${{ matrix.race }}
+          path: artifacts/triposr/${{ matrix.race }}/
+          if-no-files-found: warn
+          retention-days: 14
