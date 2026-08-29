@@ -54,13 +54,38 @@ jobs:
           if(p.target!=='premium refined OSRS/07Scape'||p.races?.length!==5) process.exit(1);
           for(const [key,id] of Object.entries(expected)){
             const r=p.races.find(x=>x.key===key);
-            if(!r||r.elementId!==id||r.productionMesh!==false||r.rigType!=='articulated-rigid-part') process.exit(1);
+            if(!r||r.elementId!==id||r.productionMesh!==true||r.skinnedMesh!==true||r.rigType!=='skinned-humanoid'||r.skinning!=='weighted-skeletal') process.exit(1);
             if(r.url!==r.heroUrl||!r.midUrl||!r.farUrl) process.exit(1);
             if((r.triangles?.hero||0)<5500||(r.triangles?.mid||0)<2500||(r.triangles?.far||0)<=0||(r.triangles?.far||0)>2200) process.exit(1);
             for(const part of required) if(!r.parts?.includes(part)) process.exit(1);
             const refs=referenceJobs[key],lock=r.referenceLock;
             if(!lock||lock.elementId!==id||lock.aPoseJob!==refs.aPose||lock.turnaroundJob!==refs.turnaround||lock.detailJob!==refs.detail||lock.turnaroundResolution!=='4k') process.exit(1);
-            if(!r.materials?.length||!r.silhouetteNotes||!r.generatorVersion) process.exit(1);
+            if((r.skinnedMeshes?.hero||0)<1||(r.bones?.hero||0)<20) process.exit(1);
+            if(!r.materials?.length||!r.silhouetteNotes||r.generatorVersion!=='4.0.0-reference-locked-skinned') process.exit(1);
+          }
+          NODE
+          node - <<'NODE'
+          const fs=require('fs');
+          function readGlb(file){
+            const b=fs.readFileSync(file);
+            if(b.length<20||b.toString('utf8',0,4)!=='glTF') throw new Error(file+': not GLB');
+            const jsonLen=b.readUInt32LE(12),jsonType=b.readUInt32LE(16);
+            if(jsonType!==0x4e4f534a) throw new Error(file+': first chunk is not JSON');
+            return JSON.parse(b.toString('utf8',20,20+jsonLen).replace(/\u0000/g,'').trim());
+          }
+          const races=['cairnborn','brinesworn','myceliad','veylkin','echoed'];
+          const required=['pelvis','torso','abdomen','head','shoulder_L','shoulder_R','upper_arm_L','upper_arm_R','forearm_L','forearm_R','hand_L','hand_R','hip_L','hip_R','thigh_L','thigh_R','shin_L','shin_R','foot_L','foot_R'];
+          for(const race of races)for(const suffix of['','_mid','_far']){
+            const file=`dist/assets/races/gauntlet_${race}${suffix}_v1.glb`,g=readGlb(file);
+            if(!g.skins?.length) throw new Error(file+': missing glTF skins');
+            const jointCount=Math.max(...g.skins.map(s=>s.joints?.length||0));
+            if(jointCount<20) throw new Error(file+`: only ${jointCount} joints`);
+            const hasSkinNode=(g.nodes||[]).some(n=>Number.isInteger(n.skin));
+            if(!hasSkinNode) throw new Error(file+': no node references a skin');
+            const primitives=(g.meshes||[]).flatMap(m=>m.primitives||[]);
+            if(!primitives.some(p=>p.attributes?.JOINTS_0!==undefined&&p.attributes?.WEIGHTS_0!==undefined)) throw new Error(file+': missing JOINTS_0/WEIGHTS_0');
+            const names=new Set((g.nodes||[]).map(n=>n.name).filter(Boolean));
+            for(const name of required)if(!names.has(name)) throw new Error(file+`: missing bone ${name}`);
           }
           NODE
           test -f dist/assets/authored/quaternius-dressed/Male_Ranger.gltf
