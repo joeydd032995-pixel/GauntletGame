@@ -21,9 +21,9 @@ function tune(root){
     const list=Array.isArray(o.material)?o.material:[o.material];for(const m of list){if(!m)continue;if(!seen.has(m)){seen.add(m);materials++;}if('roughness'in m)m.roughness=Math.max(.62,m.roughness??.8);if('envMapIntensity'in m)m.envMapIntensity=.28;m.needsUpdate=true;}
   });return{triangles,meshes,skinnedMeshes,bones,materials};
 }
-function capturePivots(root){
+function capturePivots(root,allowMissing=false){
   const pivots={};for(const n of PIVOT_NAMES){const o=root.getObjectByName(n);if(o)pivots[n]={o,base:o.rotation.clone()};}
-  const missing=PIVOT_NAMES.filter(n=>!pivots[n]);if(missing.length)throw new Error(`Race LOD missing animation pivots: ${missing.join(', ')}`);
+  const missing=PIVOT_NAMES.filter(n=>!pivots[n]);if(missing.length&&!allowMissing)throw new Error(`Race LOD missing animation pivots: ${missing.join(', ')}`);
   return pivots;
 }
 function animate(pivots,state,speed,time){
@@ -50,7 +50,7 @@ function requestedRace(){
 
 export function installRaceCharacterSystem(heroRoot){
   const layer=new THREE.Group();layer.name='GauntletRaceLayer';layer.userData.raceCharacterRoot=true;heroRoot.add(layer);
-  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,referenceLock:null,generatorVersion:null,error:null,triangles:0,heroTriangles:0,meshes:0,skinnedMeshes:0,bones:0,materials:0,productionMesh:true,skinnedMesh:true,skinning:'weighted-skeletal',rigType:'skinned-humanoid',lod:'hero',lodReady:{hero:false,mid:false,far:false},lodError:null,lodDistances:{heroMax:11,midMax:24}};
+  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,referenceLock:null,generatorVersion:null,error:null,triangles:0,heroTriangles:0,meshes:0,skinnedMeshes:0,bones:0,materials:0,productionMesh:true,skinnedMesh:true,skinning:'weighted-skeletal',rigType:'skinned-humanoid',previewUnaccepted:false,lod:'hero',lodReady:{hero:false,mid:false,far:false},lodError:null,lodDistances:{heroMax:11,midMax:24}};
   let lodScenes={hero:null,mid:null,far:null},lodReports={hero:null,mid:null,far:null},activeLod='hero',pivots={},token=0,time=0,lodOverride=null;
 
   function suppressLegacy(){
@@ -59,7 +59,7 @@ export function installRaceCharacterSystem(heroRoot){
   function activateLod(next){
     const scene=lodScenes[next];if(!scene||next===activeLod)return false;
     for(const [key,value] of Object.entries(lodScenes))if(value)value.visible=key===next;
-    activeLod=next;pivots=capturePivots(scene);const report=lodReports[next];
+    activeLod=next;pivots=capturePivots(scene,status.previewUnaccepted);const report=lodReports[next];
     status.lod=next;status.triangles=report?.triangles||status.triangles;status.meshes=report?.meshes||status.meshes;status.skinnedMeshes=report?.skinnedMeshes||status.skinnedMeshes;status.bones=report?.bones||status.bones;status.materials=report?.materials||status.materials;
     return true;
   }
@@ -67,11 +67,11 @@ export function installRaceCharacterSystem(heroRoot){
     const field=`${lod}Url`,url=entry[field];if(!url)return;
     try{
       const gltf=await load(url);if(generation!==token)return;
-      const scene=cloneScene(gltf.scene);scene.name=`RaceVisual:${entry.label}:${lod}`;scene.userData.raceCharacter=true;scene.userData.lod=lod;scene.visible=lod==='hero';
-      const report=tune(scene);
-      if(report.skinnedMeshes<1||report.bones<20)throw new Error(`Race ${entry.key}/${lod} is not a valid skinned humanoid: ${JSON.stringify(report)}`);
-      capturePivots(scene);lodScenes[lod]=scene;lodReports[lod]=report;layer.add(scene);status.lodReady[lod]=true;
-      if(lod==='hero'){activeLod='hero';pivots=capturePivots(scene);status.triangles=report.triangles;status.heroTriangles=report.triangles;status.meshes=report.meshes;status.skinnedMeshes=report.skinnedMeshes;status.bones=report.bones;status.materials=report.materials;}
+      const scene=cloneScene(gltf.scene);scene.name=`RaceVisual:${entry.label}:${lod}`;scene.userData.raceCharacter=true;scene.userData.lod=lod;scene.userData.previewUnaccepted=entry.previewUnaccepted===true;scene.visible=lod==='hero';
+      const report=tune(scene);const preview=entry.previewUnaccepted===true;
+      if(!preview&&(report.skinnedMeshes<1||report.bones<20))throw new Error(`Race ${entry.key}/${lod} is not a valid skinned humanoid: ${JSON.stringify(report)}`);
+      capturePivots(scene,preview);lodScenes[lod]=scene;lodReports[lod]=report;layer.add(scene);status.lodReady[lod]=true;
+      if(lod==='hero'){activeLod='hero';pivots=capturePivots(scene,preview);status.triangles=report.triangles;status.heroTriangles=report.triangles;status.meshes=report.meshes;status.skinnedMeshes=report.skinnedMeshes;status.bones=report.bones;status.materials=report.materials;}
     }catch(error){if(generation!==token)return;if(lod==='hero')throw error;status.lodError=`${lod}: ${String(error?.message||error)}`;console.warn(`Race ${lod} LOD load failed`,error);}
   }
   async function setRace(key){
@@ -79,7 +79,7 @@ export function installRaceCharacterSystem(heroRoot){
     const generation=++token;status.ready=false;status.error=null;status.lodError=null;status.lod='hero';status.lodReady={hero:false,mid:false,far:false};activeLod='hero';lodScenes={hero:null,mid:null,far:null};lodReports={hero:null,mid:null,far:null};pivots={};layer.clear();
     try{
       const mf=await manifest(),entry=mf.races.find(r=>r.key===key)||mf.races.find(r=>r.key===mf.defaultRace);if(!entry)throw new Error(`Unknown race ${key}`);
-      status.lodDistances=mf.lodDistances||status.lodDistances;
+      status.previewUnaccepted=entry.previewUnaccepted===true;status.lodDistances=mf.lodDistances||status.lodDistances;
       const heroUrl=entry.heroUrl||entry.url;if(!heroUrl)throw new Error(`Race ${entry.key} has no hero URL`);
       const heroEntry={...entry,heroUrl};await prepareLod(heroEntry,'hero',generation);if(generation!==token)return;
       status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.referenceLock=entry.referenceLock?{...entry.referenceLock}:null;status.generatorVersion=entry.generatorVersion||mf.generatorVersion||null;status.ready=true;status.productionMesh=entry.productionMesh===true;status.skinnedMesh=entry.skinnedMesh===true;status.skinning=entry.skinning||'weighted-skeletal';status.rigType=entry.rigType||'skinned-humanoid';
