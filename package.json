@@ -16,7 +16,7 @@
     "qa:character": "node qa/reference-character-capture.mjs",
     "qa:character:critic": "node qa/character-critic.mjs",
     "qa:blind": "node qa/blind-compare.mjs",
-    "assets:races": "node scripts/build-race-proxies.mjs"
+    "assets:races": "node scripts/build-race-proxies.mjs && node scripts/validate-race-skinning.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
