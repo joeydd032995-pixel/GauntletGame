@@ -22,6 +22,7 @@ jobs:
           git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR.git /tmp/TripoSR
           cd /tmp/TripoSR
           python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check onnxruntime
       - name: Acquire locked Cairnborn A-pose
         run: |
           mkdir -p artifacts/triposr-cpu/cairnborn
