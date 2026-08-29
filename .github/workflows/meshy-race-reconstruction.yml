@@ -1,0 +1,42 @@
+name: Meshy Race Reconstruction
+
+on:
+  push:
+    branches: ['sol/environment-gauntlet']
+    paths:
+      - '.github/scripts/meshy_reconstruct_races.py'
+      - '.github/workflows/meshy-race-reconstruction.yml'
+  workflow_dispatch:
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MESHY_API_KEY: ${{ secrets.MESHY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install reconstruction dependencies
+        run: python -m pip install --disable-pip-version-check requests pillow
+      - name: Verify Meshy credential presence
+        run: |
+          python - <<'PY'
+          import os,sys
+          if not os.environ.get('MESHY_API_KEY'):
+              print('MESHY_API_KEY repository secret is not configured.', file=sys.stderr)
+              sys.exit(2)
+          print('MESHY_API_KEY is configured; value remains masked.')
+          PY
+      - name: Generate and rig all five race heroes
+        run: python .github/scripts/meshy_reconstruct_races.py
+      - name: Upload raw Meshy reconstruction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meshy-race-reconstruction
+          path: artifacts/meshy-races/
+          if-no-files-found: warn
+          retention-days: 14
