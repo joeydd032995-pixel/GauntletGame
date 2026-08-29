@@ -5,6 +5,7 @@ on:
     branches: ['sol/environment-gauntlet']
     paths:
       - '.github/scripts/hf_free_reconstruct_races.py'
+      - '.github/scripts/hf_free_rawmesh_runner.py'
       - '.github/workflows/free-3d-race-reconstruction.yml'
   workflow_dispatch:
 
@@ -23,8 +24,8 @@ jobs:
           python-version: '3.11'
       - name: Install Gradio client matching public 3D Spaces
         run: python -m pip install --disable-pip-version-check 'gradio_client==1.13.3' requests pillow
-      - name: Run SF3D and TRELLIS.2 tournament for ${{ matrix.race }}
-        run: python .github/scripts/hf_free_reconstruct_races.py --race '${{ matrix.race }}' --challenger
+      - name: Run raw SF3D and TRELLIS.2 tournament for ${{ matrix.race }}
+        run: python .github/scripts/hf_free_rawmesh_runner.py --race '${{ matrix.race }}' --challenger
       - name: Inventory generated GLBs
         if: always()
         run: |
