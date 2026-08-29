@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "name": "Gauntlet Race Reference Fidelity Gate",
+  "policy": "zero-critical-miss",
+  "minimumOverallScore": 97,
+  "minimumCategoryScore": 95,
+  "criticalMissesAllowed": 0,
+  "viewsRequired": ["front", "left", "back", "right"],
+  "categories": {
+    "identity": {"weight": 18, "minimum": 98},
+    "silhouette": {"weight": 16, "minimum": 97},
+    "proportions": {"weight": 14, "minimum": 97},
+    "anatomyAndRaceFeatures": {"weight": 14, "minimum": 98},
+    "garmentsArmorAndAttachments": {"weight": 12, "minimum": 96},
+    "materialsAndPalette": {"weight": 9, "minimum": 95},
+    "secondaryForms": {"weight": 7, "minimum": 95},
+    "surfaceLanguage": {"weight": 5, "minimum": 95},
+    "rigDeformation": {"weight": 3, "minimum": 96},
+    "runtimeReadability": {"weight": 2, "minimum": 95}
+  },
+  "hardFailures": [
+    "any missing or substituted race-defining feature",
+    "generic humanoid silhouette where reference is distinctive",
+    "primitive/capsule/cylinder/egg construction visible at gameplay camera distance",
+    "face or head construction materially different from reference",
+    "armor, clothing, crown, mantle, shell, rune, fungal, sensory, or timeline forms materially redesigned",
+    "front/side/back forms inconsistent with the locked turnaround",
+    "incorrect race height or major landmark proportions beyond 3 percent of character height",
+    "palette or material-zone drift that changes character identity",
+    "floating, detached, intersecting, or implausibly attached signature geometry",
+    "skin collapse, candy-wrapper twist, weight popping, or armor rubberization during required animation poses",
+    "technical pass presented as visual acceptance without reference comparison evidence",
+    "procedural placeholder source presented as production-authored replacement"
+  ],
+  "technicalRequirements": {
+    "productionMesh": true,
+    "skinnedMesh": true,
+    "rigType": "skinned-humanoid",
+    "skinning": "weighted-skeletal",
+    "minimumBones": 24,
+    "maximumInfluencesPerVertex": 4,
+    "weightSumTolerance": 0.001,
+    "requiredLods": ["hero", "mid", "far"],
+    "heroTriangleRange": [12000, 45000],
+    "midTriangleRange": [6000, 24000],
+    "farTriangleRange": [1500, 9000]
+  },
+  "sourceRequirements": {
+    "mustUseLockedElement": true,
+    "mustUseCanonicalAPose": true,
+    "mustUse4kTurnaround": true,
+    "mustUse4kDetailBoard": true,
+    "mustUseActual3dReconstructionOrAuthoredModeling": true,
+    "proceduralProxyAllowed": false,
+    "source3dJobRequired": true
+  },
+  "releaseRule": "Every race must individually pass every hard failure check, every category minimum, overall >= 97, all four views, technical validation, and locked-reference provenance. One failed race rejects the entire five-race release."
+}
