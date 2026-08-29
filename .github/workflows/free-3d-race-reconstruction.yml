@@ -5,33 +5,38 @@ on:
     branches: ['sol/environment-gauntlet']
     paths:
       - '.github/scripts/hf_free_reconstruct_races.py'
-      - '.github/scripts/hf_free_reconstruct_runner.py'
       - '.github/workflows/free-3d-race-reconstruction.yml'
   workflow_dispatch:
 
 jobs:
   reconstruct:
+    strategy:
+      fail-fast: false
+      matrix:
+        race: [cairnborn, brinesworn, myceliad, veylkin, echoed]
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install free reconstruction client
-        run: python -m pip install --disable-pip-version-check gradio_client requests pillow
-      - name: Run SF3D and TRELLIS.2 tournament for all five races
-        run: python .github/scripts/hf_free_reconstruct_runner.py --race all --challenger
+      - name: Install Gradio client matching public 3D Spaces
+        run: python -m pip install --disable-pip-version-check 'gradio_client==1.13.3' requests pillow
+      - name: Run SF3D and TRELLIS.2 tournament for ${{ matrix.race }}
+        run: python .github/scripts/hf_free_reconstruct_races.py --race '${{ matrix.race }}' --challenger
       - name: Inventory generated GLBs
         if: always()
         run: |
-          echo '=== Free 3D outputs ==='
-          find artifacts/free-3d-races -maxdepth 3 -type f -printf '%p %s bytes\n' 2>/dev/null || true
+          echo '=== Free 3D outputs: ${{ matrix.race }} ==='
+          find artifacts/free-3d-races/${{ matrix.race }} -maxdepth 2 -type f -printf '%p %s bytes\n' 2>/dev/null || true
       - name: Upload free 3D reconstruction evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: free-3d-race-tournament
-          path: artifacts/free-3d-races/
+          name: free-3d-${{ matrix.race }}
+          path: |
+            artifacts/free-3d-races/${{ matrix.race }}/
+            artifacts/free-3d-races/downloads/
           if-no-files-found: warn
           retention-days: 14
