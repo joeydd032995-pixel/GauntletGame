@@ -37,11 +37,14 @@ jobs:
           fi
           test -n "$CANDIDATE"
           cp "$CANDIDATE" artifacts/charactergen-cairnborn/cairnborn-charactergen-candidate.glb
+      - name: Prepare generated race manifest
+        run: |
+          npm install
+          npm run assets:races
       - name: Install candidate as explicitly unaccepted WIP
         run: node scripts/install-cairnborn-wip-preview.mjs artifacts/charactergen-cairnborn/cairnborn-charactergen-candidate.glb
       - name: Build client and install browser
         run: |
-          npm install
           npm run build
           npx playwright install --with-deps chromium
       - name: Start client
