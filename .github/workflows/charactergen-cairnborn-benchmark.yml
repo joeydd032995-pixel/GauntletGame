@@ -1,0 +1,125 @@
+name: CharacterGen Cairnborn Benchmark
+
+on:
+  push:
+    branches: ['sol/environment-gauntlet']
+    paths:
+      - '.github/workflows/charactergen-cairnborn-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Clone CharacterGen
+        run: git clone --depth 1 https://github.com/zjp-shadow/CharacterGen.git /tmp/CharacterGen
+      - name: Install CPU PyTorch and CharacterGen dependencies
+        run: |
+          python -m pip install --disable-pip-version-check torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check -r /tmp/CharacterGen/requirements.txt
+          python -m pip install --disable-pip-version-check huggingface_hub pygltflib pymeshlab trimesh pillow opencv-python-headless
+      - name: Download CharacterGen 3D-stage weights only
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download('zjpshadow/CharacterGen', local_dir='/tmp/CharacterGen', allow_patterns=['3D_Stage/*'])
+          PY
+          du -sh /tmp/CharacterGen/3D_Stage
+      - name: Acquire locked Cairnborn turnaround
+        run: |
+          mkdir -p artifacts/charactergen-cairnborn/views
+          curl -fL --retry 4 --retry-delay 2 'https://d8j0ntlcm91z4.cloudfront.net/user_3IW29AsWwaKT2gBThWl4v30lXFQ/hf_20260829_000923_8c5e983c-f451-4d13-9d1a-01ae08424ebd.png' -o artifacts/charactergen-cairnborn/turnaround.png
+      - name: Extract four modeling views
+        run: |
+          python - <<'PY'
+          from PIL import Image, ImageChops, ImageFilter, ImageOps
+          from pathlib import Path
+          src=Image.open('artifacts/charactergen-cairnborn/turnaround.png').convert('RGB')
+          small=src.resize((1024,1024))
+          pts=[small.getpixel((8,8)),small.getpixel((1015,8)),small.getpixel((8,1015)),small.getpixel((1015,1015))]
+          bg=tuple(sum(p[i] for p in pts)//4 for i in range(3))
+          diff=ImageChops.difference(small,Image.new('RGB',small.size,bg)).convert('L').filter(ImageFilter.GaussianBlur(2))
+          mask=diff.point(lambda p:255 if p>24 else 0).resize((256,256),Image.Resampling.NEAREST)
+          px=mask.load(); seen=set(); comps=[]
+          for y in range(256):
+            for x in range(256):
+              if not px[x,y] or (x,y) in seen: continue
+              stack=[(x,y)]; seen.add((x,y)); xs=[]; ys=[]
+              while stack:
+                a,b=stack.pop(); xs.append(a); ys.append(b)
+                for na,nb in ((a+1,b),(a-1,b),(a,b+1),(a,b-1)):
+                  if 0<=na<256 and 0<=nb<256 and px[na,nb] and (na,nb) not in seen:
+                    seen.add((na,nb)); stack.append((na,nb))
+              if len(xs)>350:
+                comps.append((len(xs),min(xs),min(ys),max(xs)+1,max(ys)+1))
+          boxes=[]
+          for area,x0,y0,x1,y1 in sorted(comps,reverse=True)[:12]:
+            w=x1-x0; h=y1-y0
+            if h>45 and w>18 and h/w>1.1: boxes.append((x0,y0,x1,y1,area))
+          boxes=sorted(boxes,key=lambda b:(b[1]//64,b[0]))[:4]
+          if len(boxes)!=4: raise SystemExit(f'Expected four full-body components, found {boxes}')
+          scale=src.width/256
+          out=Path('artifacts/charactergen-cairnborn/views')
+          names=['front','left','back','threequarter']
+          made={}
+          for name,(x0,y0,x1,y1,_) in zip(names,boxes):
+            pad=8
+            crop=src.crop((max(0,int((x0-pad)*scale)),max(0,int((y0-pad)*scale)),min(src.width,int((x1+pad)*scale)),min(src.height,int((y1+pad)*scale))))
+            crop.thumbnail((512,768),Image.Resampling.LANCZOS)
+            canvas=Image.new('RGBA',(512,768),(128,128,128,255)); canvas.paste(crop,((512-crop.width)//2,(768-crop.height)//2))
+            canvas.save(out/f'{name}.png'); made[name]=canvas
+          # CharacterGen requires a right view; use the left silhouette mirrored rather than inventing new geometry.
+          ImageOps.mirror(made['left']).save(out/'right.png')
+          print('extracted', list(out.glob('*.png')))
+          PY
+      - name: Patch CharacterGen 3D stage for CPU benchmark
+        run: |
+          cd /tmp/CharacterGen/3D_Stage
+          sed -i 's/device = "cuda"/device = "cpu"/' webui.py
+          grep -n 'device =' webui.py | head
+      - name: Run four-view 3D reconstruction
+        run: |
+          cd /tmp/CharacterGen/3D_Stage
+          python - <<'PY'
+          import os, sys, shutil
+          from PIL import Image
+          sys.path.insert(0,'.')
+          # Importing webui loads only the 3D reconstruction system and local weights.
+          import webui
+          base=os.environ['GITHUB_WORKSPACE']+'/artifacts/charactergen-cairnborn/views'
+          back=Image.open(base+'/back.png').convert('RGBA')
+          front=Image.open(base+'/front.png').convert('RGBA')
+          right=Image.open(base+'/right.png').convert('RGBA')
+          left=Image.open(base+'/left.png').convert('RGBA')
+          save_dir,obj,glb=webui.inferapi.process_images(back,front,right,left,False)
+          dst=os.environ['GITHUB_WORKSPACE']+'/artifacts/charactergen-cairnborn/cairnborn-charactergen-candidate.glb'
+          shutil.copy2(glb,dst)
+          print('OUTPUT',dst,os.path.getsize(dst))
+          PY
+      - name: Record acceptance provenance
+        if: success()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('artifacts/charactergen-cairnborn/cairnborn-charactergen-candidate.glb')
+          pathlib.Path('artifacts/charactergen-cairnborn/reconstruction.json').write_text(json.dumps({
+            'race':'cairnborn','provider':'CharacterGen 3D Stage self-hosted CPU','elementId':'579defc6-18d2-4dd7-83ff-6d23a51f31fe','candidateBytes':p.stat().st_size,'status':'GENERATED_UNACCEPTED',
+            'acceptance':{'overallMin':97,'categoryFloor':95,'identityAnatomyMin':98,'silhouetteProportionMin':97,'criticalMissesAllowed':0}
+          },indent=2))
+          PY
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charactergen-cairnborn-benchmark
+          path: artifacts/charactergen-cairnborn/
+          if-no-files-found: warn
+          retention-days: 14
