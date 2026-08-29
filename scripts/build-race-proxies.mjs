@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 if (typeof globalThis.FileReader === 'undefined') {
   globalThis.FileReader = class FileReader {
@@ -15,7 +16,7 @@ const OUT=path.resolve('public/assets/races');
 await fs.mkdir(OUT,{recursive:true});
 const exporter=new GLTFExporter();
 const ART='premium refined OSRS/07Scape';
-const GENERATOR_VERSION='3.0.0-reference-locked';
+const GENERATOR_VERSION='4.0.0-reference-locked-skinned';
 const deg=THREE.MathUtils.degToRad;
 
 const REQUIRED_PARTS=['pelvis','torso','chest_band','abdomen','head','crest','shoulder_L','shoulder_R','arm_L','arm_R','upper_arm_L','upper_arm_R','forearm_L','forearm_R','hand_L','hand_R','hip_L','hip_R','thigh_L','thigh_R','shin_L','shin_R','foot_L','foot_R','belt'];
@@ -48,6 +49,105 @@ function fin(name,side,material,thickness=.025,span=.12,height=.09){const g=new 
 function membrane(name,side,material,scale=1){const s=side;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,.18,0,.36*s,.09,.015,.33*s,-.12,.03,.08*s,-.18,.015,0,.18,.035,.36*s,.09,.05,.33*s,-.12,.065,.08*s,-.18,.05],3));g.setIndex([0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]);g.computeVertexNormals();const o=mesh(g,material,name);o.scale.setScalar(scale);return o;}
 function add(parent,obj,pos=[0,0,0],rot=[0,0,0]){obj.position.set(...pos);obj.rotation.set(...rot);parent.add(obj);return obj;}
 function group(parent,name,pos=[0,0,0]){const g=new THREE.Group();g.name=name;g.position.set(...pos);parent.add(g);return g;}
+
+
+function clamp01(v){return Math.max(0,Math.min(1,v));}
+function smooth01(v){v=clamp01(v);return v*v*(3-2*v);}
+function nearestMappedGroup(node,groupToBone,root){
+  for(let p=node.parent;p&&p!==root;p=p.parent)if(groupToBone.has(p))return p;
+  return null;
+}
+function sideFromName(name){return name.includes('_L')||name.endsWith('L')?'L':name.includes('_R')||name.endsWith('R')?'R':null;}
+function normalizeInfluences(items){
+  const acc=new Map();
+  for(const [index,weight] of items){if(index==null||weight<=0)continue;acc.set(index,(acc.get(index)||0)+weight);}
+  const sorted=[...acc.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const total=sorted.reduce((s,x)=>s+x[1],0)||1;
+  return sorted.map(([i,w])=>[i,w/total]);
+}
+function weightGeometry(geometry,meshName,primaryName,boneIndex){
+  const pos=geometry.getAttribute('position');geometry.computeBoundingBox();
+  const minY=geometry.boundingBox?.min.y??0,maxY=geometry.boundingBox?.max.y??1,span=Math.max(1e-5,maxY-minY);
+  const primary=boneIndex.get(primaryName)??boneIndex.get('root')??0;
+  const indices=new Uint16Array(pos.count*4),weights=new Float32Array(pos.count*4);
+  const side=sideFromName(meshName)||sideFromName(primaryName);
+  const idx=name=>boneIndex.get(name);
+  for(let i=0;i<pos.count;i++){
+    const y=pos.getY(i),top=clamp01((y-minY)/span),bottom=1-top;
+    let inf=[[primary,1]];
+    if(/^upper_arm_[LR]_mesh$/.test(meshName)&&side){
+      const w=.38*smooth01((bottom-.58)/.42);inf=[[idx(`upper_arm_${side}`),1-w],[idx(`forearm_${side}`),w]];
+    }else if(/^forearm_[LR]_mesh$/.test(meshName)&&side){
+      const wt=.24*smooth01((top-.72)/.28),wb=.20*smooth01((bottom-.74)/.26);
+      inf=[[idx(`forearm_${side}`),1-wt-wb],[idx(`upper_arm_${side}`),wt],[idx(`hand_${side}`),wb]];
+    }else if(/^thigh_[LR]_mesh$/.test(meshName)&&side){
+      const wt=.18*smooth01((top-.76)/.24),wb=.40*smooth01((bottom-.58)/.42);
+      inf=[[idx(`thigh_${side}`),1-wt-wb],[idx(`hip_${side}`),wt],[idx(`shin_${side}`),wb]];
+    }else if(/^shin_[LR]_mesh$/.test(meshName)&&side){
+      const wt=.28*smooth01((top-.70)/.30),wb=.22*smooth01((bottom-.76)/.24);
+      inf=[[idx(`shin_${side}`),1-wt-wb],[idx(`thigh_${side}`),wt],[idx(`foot_${side}`),wb]];
+    }else if(meshName==='neck_mesh'){
+      const wt=.45*smooth01((top-.45)/.55);inf=[[idx('torso'),1-wt],[idx('head'),wt]];
+    }else if(meshName==='abdomen_mass'){
+      const wt=.28*smooth01((top-.63)/.37),wb=.32*smooth01((bottom-.63)/.37);
+      inf=[[idx('abdomen'),1-wt-wb],[idx('torso'),wt],[idx('pelvis'),wb]];
+    }else if(meshName==='torso_mass'){
+      const wb=.28*smooth01((bottom-.68)/.32);inf=[[idx('torso'),1-wb],[idx('abdomen'),wb]];
+    }else if(meshName==='pelvis_mass'){
+      const wb=.18*smooth01((bottom-.74)/.26);inf=[[idx('pelvis'),1-wb],[idx('abdomen'),wb]];
+    }
+    const clean=normalizeInfluences(inf);
+    for(let j=0;j<4;j++){const pair=clean[j];indices[i*4+j]=pair?.[0]??0;weights[i*4+j]=pair?.[1]??0;}
+  }
+  geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(indices,4));
+  geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));
+}
+function buildSkinnedCharacter(sourceRoot,def,lod,referenceLock){
+  sourceRoot.updateMatrixWorld(true);
+  const out=new THREE.Group();out.name=sourceRoot.name;out.userData={gauntletRaceSkinned:true,lod,race:def.label,elementId:def.elementId,referenceLock};
+  const armature=new THREE.Group();armature.name='Armature';out.add(armature);
+  const rootBone=new THREE.Bone();rootBone.name='root';armature.add(rootBone);
+  const groupToBone=new Map([[sourceRoot,rootBone]]);
+  const cloneGroups=(src,parentBone)=>{
+    for(const child of src.children){
+      if(child.isMesh)continue;
+      const bone=new THREE.Bone();bone.name=child.name||`bone_${groupToBone.size}`;
+      bone.position.copy(child.position);bone.quaternion.copy(child.quaternion);bone.scale.copy(child.scale);
+      parentBone.add(bone);groupToBone.set(child,bone);cloneGroups(child,bone);
+    }
+  };
+  cloneGroups(sourceRoot,rootBone);
+  const bones=[];rootBone.traverse(o=>{if(o.isBone)bones.push(o);});
+  const boneIndex=new Map(bones.map((b,i)=>[b.name,i]));
+  out.updateMatrixWorld(true);
+  const skeleton=new THREE.Skeleton(bones);skeleton.calculateInverses();
+  const buckets=new Map();
+  sourceRoot.traverse(o=>{
+    if(!o.isMesh)return;
+    const group=nearestMappedGroup(o,groupToBone,sourceRoot),primaryBone=groupToBone.get(group)||rootBone;
+    const g=o.geometry.clone();
+    for(const key of Object.keys(g.attributes))if(key!=='position'&&key!=='normal')g.deleteAttribute(key);
+    if(!g.getAttribute('normal'))g.computeVertexNormals();
+    weightGeometry(g,o.name,primaryBone.name,boneIndex);
+    g.applyMatrix4(o.matrixWorld);
+    const normalized=g.index?g.toNonIndexed():g;
+    const m=Array.isArray(o.material)?o.material[0]:o.material;
+    const key=m?.name||'material';
+    if(!buckets.has(key))buckets.set(key,{material:m?.clone?.()||m,geometries:[]});
+    buckets.get(key).geometries.push(normalized);
+  });
+  let skinnedMeshes=0;
+  for(const [name,bucket] of buckets){
+    const merged=mergeGeometries(bucket.geometries,false);
+    if(!merged)throw new Error(`${def.key}/${lod} failed to merge skinned surface ${name}`);
+    const sm=new THREE.SkinnedMesh(merged,bucket.material);sm.name=`SkinnedSurface:${name}`;sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=true;
+    out.add(sm);sm.bind(skeleton,new THREE.Matrix4());skinnedMeshes++;
+    for(const g of bucket.geometries)g.dispose?.();
+  }
+  out.userData.rigType='skinned-humanoid';out.userData.productionMesh=true;out.userData.skinning='weighted-skeletal';out.userData.boneCount=bones.length;out.userData.skinnedMeshes=skinnedMeshes;
+  out.updateMatrixWorld(true);
+  return out;
+}
 
 function createMaterials(key){
   if(key==='cairnborn')return{skin:mat('basalt',0x59635f,{roughness:.98}),cloth:mat('bastion_cloth',0x33423f,{roughness:.93}),leather:mat('earth_leather',0x4a3727,{roughness:.9}),primary:mat('slate_plate',0x788078,{roughness:.96}),secondary:mat('granite_edge',0x4a5552,{roughness:.94}),metal:mat('bronze_inlay',0x9a793e,{metalness:.48,roughness:.48}),accent:mat('ancestral_rune',0x62d5ca,{roughness:.32,emissive:0x1d7772,emissiveIntensity:.68}),tertiary:mat('lichen',0x65724d,{roughness:1})};
@@ -122,12 +222,29 @@ const defs=[
   {key:'veylkin',label:'Veylkin',faction:'Verdant Oath',elementId:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',height:1.91,shoulder:.39,waist:.235,hip:.27,headScale:1.00,bulk:.90,decorate:decorateVeylkin,silhouetteNotes:'Tall narrow nocturnal frame with sensory crests, moth mantle and restrained vestigial membranes.'},
   {key:'echoed',label:'Echoed',faction:'Neutral / Chosen',elementId:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db',height:1.83,shoulder:.43,waist:.26,hip:.29,headScale:.98,bulk:.98,decorate:decorateEchoed,silhouetteNotes:'Deliberately asymmetric timeline-displaced humanoid with mismatched faction forms and spectral relic shards.'}
 ];
-function measure(root){let triangles=0,meshes=0;const materials=new Set();root.traverse(o=>{if(!o.isMesh)return;meshes++;const g=o.geometry;triangles+=Math.floor((g?.index?.count??g?.attributes?.position?.count??0)/3);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m?.name)materials.add(m.name);});return{triangles,meshes,materials:[...materials].sort()};}
+function measure(root){let triangles=0,meshes=0,skinnedMeshes=0,bones=0;const materials=new Set();root.traverse(o=>{if(o.isBone)bones++;if(!o.isMesh)return;meshes++;if(o.isSkinnedMesh)skinnedMeshes++;const g=o.geometry;triangles+=Math.floor((g?.index?.count??g?.attributes?.position?.count??0)/3);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m?.name)materials.add(m.name);});return{triangles,meshes,skinnedMeshes,bones,materials:[...materials].sort()};}
 function validateParts(root,def,lod){const missing=REQUIRED_PARTS.filter(n=>!root.getObjectByName(n));if(missing.length)throw new Error(`${def.key}/${lod} missing pivots: ${missing.join(', ')}`);}
 async function exportGlb(root,filename){root.updateMatrixWorld(true);const result=await exporter.parseAsync(root,{binary:true,onlyVisible:true,trs:true});await fs.writeFile(path.join(OUT,filename),Buffer.from(result));}
-const manifest={schemaVersion:2,target:ART,source:'Higgsfield locked Character Elements',rigType:'articulated-rigid-part',productionMesh:false,defaultRace:'cairnborn',generatorVersion:GENERATOR_VERSION,lodDistances:{heroMax:11,midMax:24},races:[]};
-for(const def of defs){const referenceLock={...ART_REFS[def.key]};if(referenceLock.elementId!==def.elementId)throw new Error(`Reference Element ID drift for ${def.key}`);const record={key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,productionMesh:false,rigType:'articulated-rigid-part',generatorVersion:GENERATOR_VERSION,silhouetteNotes:def.silhouetteNotes,referenceLock,parts:[...REQUIRED_PARTS],triangles:{},meshes:{},materials:[]};for(const lod of['hero','mid','far']){const M=createMaterials(def.key);const c=makeRig(def,lod,M);def.decorate(c,lod);const model=c.root;model.userData={...model.userData,race:def.label,faction:def.faction,elementId:def.elementId,target:ART,rigType:'articulated-rigid-part',productionMesh:false,lod,referenceLock};validateParts(model,def,lod);const stats=measure(model);if(lod==='hero'&&stats.triangles<5500)throw new Error(`${def.key} hero below 5500 triangles: ${stats.triangles}`);if(lod==='mid'&&stats.triangles<2500)throw new Error(`${def.key} mid below 2500 triangles: ${stats.triangles}`);if(lod==='far'&&stats.triangles>2200)throw new Error(`${def.key} far above 2200 triangles: ${stats.triangles}`);const suffix=lod==='hero'?'':`_${lod}`;const filename=`gauntlet_${def.key}${suffix}_v1.glb`;await exportGlb(model,filename);record.triangles[lod]=stats.triangles;record.meshes[lod]=stats.meshes;if(lod==='hero')record.materials=stats.materials;record[`${lod}Url`]=`/assets/races/${filename}`;}record.url=record.heroUrl;manifest.races.push(record);}
+const manifest={schemaVersion:3,target:ART,source:'Higgsfield locked Character Elements',rigType:'skinned-humanoid',productionMesh:true,skinnedMesh:true,skinning:'weighted-skeletal',defaultRace:'cairnborn',generatorVersion:GENERATOR_VERSION,lodDistances:{heroMax:11,midMax:24},races:[]};
+for(const def of defs){
+  const referenceLock={...ART_REFS[def.key]};if(referenceLock.elementId!==def.elementId)throw new Error(`Reference Element ID drift for ${def.key}`);
+  const record={key:def.key,label:def.label,faction:def.faction,elementId:def.elementId,height:def.height,productionMesh:true,skinnedMesh:true,rigType:'skinned-humanoid',skinning:'weighted-skeletal',generatorVersion:GENERATOR_VERSION,silhouetteNotes:def.silhouetteNotes,referenceLock,parts:[...REQUIRED_PARTS],triangles:{},meshes:{},skinnedMeshes:{},bones:{},materials:[]};
+  for(const lod of['hero','mid','far']){
+    const M=createMaterials(def.key);const c=makeRig(def,lod,M);def.decorate(c,lod);
+    const model=buildSkinnedCharacter(c.root,def,lod,referenceLock);
+    model.userData={...model.userData,race:def.label,faction:def.faction,elementId:def.elementId,target:ART,rigType:'skinned-humanoid',productionMesh:true,skinnedMesh:true,lod,referenceLock};
+    validateParts(model,def,lod);const stats=measure(model);
+    if(stats.skinnedMeshes<1||stats.bones<20)throw new Error(`${def.key}/${lod} invalid skin: ${stats.skinnedMeshes} skinned meshes, ${stats.bones} bones`);
+    if(lod==='hero'&&stats.triangles<5500)throw new Error(`${def.key} hero below 5500 triangles: ${stats.triangles}`);
+    if(lod==='mid'&&stats.triangles<2500)throw new Error(`${def.key} mid below 2500 triangles: ${stats.triangles}`);
+    if(lod==='far'&&stats.triangles>2200)throw new Error(`${def.key} far above 2200 triangles: ${stats.triangles}`);
+    const suffix=lod==='hero'?'':`_${lod}`;const filename=`gauntlet_${def.key}${suffix}_v1.glb`;await exportGlb(model,filename);
+    record.triangles[lod]=stats.triangles;record.meshes[lod]=stats.meshes;record.skinnedMeshes[lod]=stats.skinnedMeshes;record.bones[lod]=stats.bones;
+    if(lod==='hero')record.materials=stats.materials;record[`${lod}Url`]=`/assets/races/${filename}`;
+  }
+  record.url=record.heroUrl;manifest.races.push(record);
+}
 if(manifest.races.length!==5)throw new Error(`Expected five races, got ${manifest.races.length}`);const expectedIds=new Map(defs.map(d=>[d.key,d.elementId]));for(const r of manifest.races){if(expectedIds.get(r.key)!==r.elementId)throw new Error(`Element ID drift for ${r.key}`);if(r.url!==r.heroUrl)throw new Error(`Legacy URL drift for ${r.key}`);}
 await fs.writeFile(path.join(OUT,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
-await fs.writeFile(path.join(OUT,'README.md'),`# Gauntlet Race Assets\n\nGenerated deterministically with \`npm run assets:races\`.\n\n- Art target: ${ART}\n- Generator: ${GENERATOR_VERSION}\n- Source lock: Higgsfield Element + canonical A-pose + 4K turnaround + 4K detail board per race\n- Rig type: articulated rigid-part (not a skinned production mesh)\n- LODs: hero, mid, far for all five races\n- Stable contract: race keys, Higgsfield Element IDs, canonical named pivots, manifest URLs\n\nFuture skinned replacements must preserve race identity, Element IDs, scale, and canonical pivot/bone mapping.\n`);
-console.log('Generated production-tier race LODs:');for(const r of manifest.races)console.log(`${r.label}: hero ${r.triangles.hero} | mid ${r.triangles.mid} | far ${r.triangles.far}`);console.log(`Output -> ${OUT}`);
+await fs.writeFile(path.join(OUT,'README.md'),`# Gauntlet Race Assets\n\nGenerated deterministically with \`npm run assets:races\`.\n\n- Art target: ${ART}\n- Generator: ${GENERATOR_VERSION}\n- Source lock: Higgsfield Element + canonical A-pose + 4K turnaround + 4K detail board per race\n- Rig type: true glTF skeletal skinning with THREE.SkinnedMesh\n- Skin weights: weighted skeletal deformation on organic joints; rigid weighting on armor/detail surfaces\n- LODs: hero, mid, far for all five races\n- Stable contract: race keys, Higgsfield Element IDs, canonical bone mapping, manifest URLs\n\nAll five GLBs now contain glTF skins, JOINTS_0 and WEIGHTS_0 attributes and are animation-ready.\n`);
+console.log('Generated reference-locked skinned race LODs:');for(const r of manifest.races)console.log(`${r.label}: hero ${r.triangles.hero}t/${r.skinnedMeshes.hero}s/${r.bones.hero}b | mid ${r.triangles.mid}t | far ${r.triangles.far}t`);console.log(`Output -> ${OUT}`);
