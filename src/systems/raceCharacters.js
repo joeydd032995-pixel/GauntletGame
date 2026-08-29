@@ -49,7 +49,7 @@ function requestedRace(){
 
 export function installRaceCharacterSystem(heroRoot){
   const layer=new THREE.Group();layer.name='GauntletRaceLayer';layer.userData.raceCharacterRoot=true;heroRoot.add(layer);
-  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,error:null,triangles:0,heroTriangles:0,meshes:0,materials:0,productionMesh:false,rigType:'articulated-rigid-part',lod:'hero',lodReady:{hero:false,mid:false,far:false},lodError:null,lodDistances:{heroMax:11,midMax:24}};
+  const status={target:'high-end OSRS/07Scape',source:'Higgsfield locked Character Elements',ready:false,current:null,faction:null,elementId:null,referenceLock:null,generatorVersion:null,error:null,triangles:0,heroTriangles:0,meshes:0,materials:0,productionMesh:false,rigType:'articulated-rigid-part',lod:'hero',lodReady:{hero:false,mid:false,far:false},lodError:null,lodDistances:{heroMax:11,midMax:24}};
   let lodScenes={hero:null,mid:null,far:null},lodReports={hero:null,mid:null,far:null},activeLod='hero',pivots={},token=0,time=0,lodOverride=null;
 
   function suppressLegacy(){
@@ -79,14 +79,14 @@ export function installRaceCharacterSystem(heroRoot){
       status.lodDistances=mf.lodDistances||status.lodDistances;
       const heroUrl=entry.heroUrl||entry.url;if(!heroUrl)throw new Error(`Race ${entry.key} has no hero URL`);
       const heroEntry={...entry,heroUrl};await prepareLod(heroEntry,'hero',generation);if(generation!==token)return;
-      status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.ready=true;status.productionMesh=entry.productionMesh??false;status.rigType=entry.rigType||'articulated-rigid-part';
+      status.current=entry.key;status.label=entry.label;status.faction=entry.faction;status.elementId=entry.elementId;status.referenceLock=entry.referenceLock?{...entry.referenceLock}:null;status.generatorVersion=entry.generatorVersion||mf.generatorVersion||null;status.ready=true;status.productionMesh=entry.productionMesh??false;status.rigType=entry.rigType||'articulated-rigid-part';
       localStorage.setItem('gauntlet.race',entry.key);window.dispatchEvent(new CustomEvent('gauntlet-race-change',{detail:snapshot()}));suppressLegacy();
       Promise.allSettled([prepareLod(entry,'mid',generation),prepareLod(entry,'far',generation)]).then(()=>{if(generation===token)window.dispatchEvent(new CustomEvent('gauntlet-race-lod-ready',{detail:snapshot()}));});
     }catch(error){status.error=String(error?.message||error);status.ready=false;console.error('Race character load failed',error);}
   }
   function desiredLod(distance){if(lodOverride)return lodOverride;const d=Math.max(0,Number(distance)||0),cuts=status.lodDistances||{};if(d<=(cuts.heroMax??11))return'hero';if(d<=(cuts.midMax??24))return'mid';return'far';}
   function update(dt,state,speed,distance=0){time+=dt;if(!status.ready)return;const wanted=desiredLod(distance);if(lodScenes[wanted])activateLod(wanted);animate(pivots,state,speed,time);suppressLegacy();}
-  function snapshot(){return{...status,lodReady:{...status.lodReady},available:[...RACE_ORDER]};}
+  function snapshot(){return{...status,referenceLock:status.referenceLock?{...status.referenceLock}:null,lodReady:{...status.lodReady},available:[...RACE_ORDER]};}
   function setLodOverride(value=null){lodOverride=['hero','mid','far'].includes(value)?value:null;const wanted=desiredLod(0);if(lodScenes[wanted])activateLod(wanted);return snapshot();}
   const api={setRace,update,snapshot,setLodOverride,layer,status};window.__GAUNTLET_RACES__=api;setRace(requestedRace());return api;
 }
