@@ -43,14 +43,23 @@ jobs:
             veylkin:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',
             echoed:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db'
           };
+          const referenceJobs={
+            cairnborn:{aPose:'c34f5065-d202-4c95-a32a-c5355328bf05',turnaround:'8c5e983c-f451-4d13-9d1a-01ae08424ebd',detail:'966d2221-dc75-482e-8f3d-7e2ff674d52b'},
+            brinesworn:{aPose:'c32b1ea8-c18b-4a47-8016-136c7e29b9e7',turnaround:'47d68649-e037-4392-8a1e-6b71fa6440ab',detail:'2cfcc5e9-8ebc-4558-ad9c-44aa08825d18'},
+            myceliad:{aPose:'1bd2383e-083e-49fd-bee8-431c70e32251',turnaround:'c30853e3-0fbb-4136-9eb9-fddfc58a164e',detail:'ee720d7d-3638-44f5-8591-74ae899e77ba'},
+            veylkin:{aPose:'8c56d46e-13e0-4720-b0b7-e72b3ca93be8',turnaround:'5c7ba582-8a5e-4a63-aa16-927ff878b35c',detail:'1517623a-20c7-4880-b7df-107bcf52d6bc'},
+            echoed:{aPose:'91e42011-0230-4c39-81a8-0d4b751d60f5',turnaround:'562e70ce-0f84-40f4-8807-ff9cd5f8cdb8',detail:'dc9a7977-63ce-445b-a55a-c98ca5e3e4cc'}
+          };
           const required=['pelvis','torso','chest_band','abdomen','head','crest','shoulder_L','shoulder_R','arm_L','arm_R','upper_arm_L','upper_arm_R','forearm_L','forearm_R','hand_L','hand_R','hip_L','hip_R','thigh_L','thigh_R','shin_L','shin_R','foot_L','foot_R','belt'];
           if(p.target!=='premium refined OSRS/07Scape'||p.races?.length!==5) process.exit(1);
           for(const [key,id] of Object.entries(expected)){
             const r=p.races.find(x=>x.key===key);
             if(!r||r.elementId!==id||r.productionMesh!==false||r.rigType!=='articulated-rigid-part') process.exit(1);
             if(r.url!==r.heroUrl||!r.midUrl||!r.farUrl) process.exit(1);
-            if((r.triangles?.hero||0)<3000||(r.triangles?.mid||0)<=0||(r.triangles?.far||0)<=0) process.exit(1);
+            if((r.triangles?.hero||0)<5500||(r.triangles?.mid||0)<2500||(r.triangles?.far||0)<=0||(r.triangles?.far||0)>2200) process.exit(1);
             for(const part of required) if(!r.parts?.includes(part)) process.exit(1);
+            const refs=referenceJobs[key],lock=r.referenceLock;
+            if(!lock||lock.elementId!==id||lock.aPoseJob!==refs.aPose||lock.turnaroundJob!==refs.turnaround||lock.detailJob!==refs.detail||lock.turnaroundResolution!=='4k') process.exit(1);
             if(!r.materials?.length||!r.silhouetteNotes||!r.generatorVersion) process.exit(1);
           }
           NODE
