@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const candidate=process.argv[2]||'artifacts/charactergen-cairnborn/cairnborn-charactergen-candidate.glb';
+if(!fs.existsSync(candidate)) throw new Error(`Missing Cairnborn WIP candidate: ${candidate}`);
+const assetDir='public/assets/races';
+fs.mkdirSync(assetDir,{recursive:true});
+const target=path.join(assetDir,'cairnborn-wip.glb');
+fs.copyFileSync(candidate,target);
+const manifestPath=path.join(assetDir,'manifest.json');
+const manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+const race=manifest.races.find(r=>r.key==='cairnborn');
+if(!race) throw new Error('Cairnborn manifest entry missing');
+race.heroUrl='/assets/races/cairnborn-wip.glb';
+delete race.midUrl;
+delete race.farUrl;
+race.previewUnaccepted=true;
+race.productionMesh=false;
+race.skinnedMesh=false;
+race.skinning='unrigged-wip';
+race.rigType='unrigged-wip';
+race.generatorVersion='charactergen-four-view-wip';
+fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
+console.log(JSON.stringify({installed:target,status:'WIP_UNACCEPTED',gate:'LOCKED'},null,2));
