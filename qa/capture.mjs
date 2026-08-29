@@ -38,18 +38,30 @@ try{
   boot=await page.evaluate(({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,environmentDetail})=>({domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,...environmentDetail,mocap:window.__GAUNTLET_MOCAP__||null,metrics:window.__GAUNTLET_METRICS__||null}),{domMs,canvasMs,firstRenderedMs,authoredReadyMs,environmentReadyMs,environmentDetailReadyMs,authored,hybridEnvironment,environmentDetail});
 
   await page.evaluate(()=>window.__GAUNTLET_RACES__.setLodOverride?.('hero'));
-  await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.enter({subject:'hero',action:'idle',view:'threeQuarter',distance:4.6,height:1.15,fov:40,neutral:true}));
+  await page.evaluate(()=>{const heroRoot=window.__GAUNTLET_RACES__?.layer?.parent;if(heroRoot)heroRoot.rotation.y=0;});
+  // Generator face geometry is authored toward -Z; rear camera angle is therefore
+  // the canonical front-facing modeling view when the hero root is normalized.
+  await page.evaluate(()=>window.__GAUNTLET_CAPTURE__.enter({subject:'hero',action:'idle',view:'rear',distance:4.25,height:1.05,fov:38,neutral:true}));
 
   const races=['cairnborn','brinesworn','myceliad','veylkin','echoed'];
+  const expectedReferenceLocks={
+    cairnborn:{elementId:'579defc6-18d2-4dd7-83ff-6d23a51f31fe',aPoseJob:'c34f5065-d202-4c95-a32a-c5355328bf05',turnaroundJob:'8c5e983c-f451-4d13-9d1a-01ae08424ebd',detailJob:'966d2221-dc75-482e-8f3d-7e2ff674d52b'},
+    brinesworn:{elementId:'d504b1e4-275d-4ccc-a07f-ab61bcc6848d',aPoseJob:'c32b1ea8-c18b-4a47-8016-136c7e29b9e7',turnaroundJob:'47d68649-e037-4392-8a1e-6b71fa6440ab',detailJob:'2cfcc5e9-8ebc-4558-ad9c-44aa08825d18'},
+    myceliad:{elementId:'d9b6f30a-fa51-47c4-b22c-70ed66c07081',aPoseJob:'1bd2383e-083e-49fd-bee8-431c70e32251',turnaroundJob:'c30853e3-0fbb-4136-9eb9-fddfc58a164e',detailJob:'ee720d7d-3638-44f5-8591-74ae899e77ba'},
+    veylkin:{elementId:'57e790db-f7c4-4a5b-a0b1-ed66a1915314',aPoseJob:'8c56d46e-13e0-4720-b0b7-e72b3ca93be8',turnaroundJob:'5c7ba582-8a5e-4a63-aa16-927ff878b35c',detailJob:'1517623a-20c7-4880-b7df-107bcf52d6bc'},
+    echoed:{elementId:'09146293-fa83-4aef-b6e1-a3e1ee7dd6db',aPoseJob:'91e42011-0230-4c39-81a8-0d4b751d60f5',turnaroundJob:'562e70ce-0f84-40f4-8807-ff9cd5f8cdb8',detailJob:'dc9a7977-63ce-445b-a55a-c98ca5e3e4cc'}
+  };
   const raceEvidence=[];
   for(let i=0;i<races.length;i++){
     const race=races[i];
     await page.evaluate(r=>window.__GAUNTLET_RACES__.setRace(r),race);
-    await page.waitForFunction(r=>{const s=window.__GAUNTLET_RACES__?.snapshot?.();return s?.ready===true&&s?.current===r&&s?.lod==='hero'&&s?.lodReady?.hero===true&&(s?.heroTriangles||0)>=3000;},race,{timeout:30000});
+    await page.waitForFunction(r=>{const s=window.__GAUNTLET_RACES__?.snapshot?.();return s?.ready===true&&s?.current===r&&s?.lod==='hero'&&s?.lodReady?.hero===true&&(s?.heroTriangles||0)>=5500;},race,{timeout:45000});
     await page.waitForTimeout(500);
     const snap=await page.evaluate(()=>window.__GAUNTLET_RACES__.snapshot());
     if(snap.productionMesh!==false||snap.rigType!=='articulated-rigid-part')throw new Error(`race contract drift: ${JSON.stringify(snap)}`);
-    raceEvidence.push({race,heroTriangles:snap.heroTriangles,activeTriangles:snap.triangles,lod:snap.lod,lodReady:snap.lodReady,elementId:snap.elementId});
+    const expected=expectedReferenceLocks[race],lock=snap.referenceLock;
+    if(!lock||snap.generatorVersion!=='3.0.0-reference-locked'||lock.elementId!==expected.elementId||lock.aPoseJob!==expected.aPoseJob||lock.turnaroundJob!==expected.turnaroundJob||lock.detailJob!==expected.detailJob||lock.turnaroundResolution!=='4k')throw new Error(`race reference provenance drift: ${JSON.stringify(snap)}`);
+    raceEvidence.push({race,heroTriangles:snap.heroTriangles,activeTriangles:snap.triangles,lod:snap.lod,lodReady:snap.lodReady,elementId:snap.elementId,generatorVersion:snap.generatorVersion,referenceLock:lock});
     mark(`${String(i+1).padStart(2,'0')}-race-${race}-1080p.png`);
   }
 
@@ -81,8 +93,9 @@ try{
   const dodgeBase=await pivotPose();await page.keyboard.press('Space');await page.waitForTimeout(140);const dodgePose=await pivotPose();if(!poseChanged(dodgeBase,dodgePose,['torso']))throw new Error('Dodge rigid-part articulation did not move torso pivot');mark('09-evade-1080p.png');await page.waitForTimeout(2200);
   metrics=await page.evaluate(raceEvidence=>({runtime:window.__GAUNTLET_METRICS__||null,races:window.__GAUNTLET_RACES__?.snapshot?.()||null,raceEvidence,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null,groundDetail:window.__GAUNTLET_GROUND_DETAIL__||null,terrainMaterial:window.__GAUNTLET_TERRAIN_MATERIAL__||null,streamingEnvironment:window.__GAUNTLET_STREAMING_ENVIRONMENT__||null}),raceEvidence);
 
-  await page.goto('http://127.0.0.1:4173/?race=veylkin',{waitUntil:'domcontentloaded',timeout:20000});
-  await page.waitForFunction(()=>window.__GAUNTLET_RACES__?.snapshot?.().ready===true&&window.__GAUNTLET_RACES__?.snapshot?.().current==='veylkin',null,{timeout:30000});
+  await page.goto('http://127.0.0.1:4173/?race=veylkin',{waitUntil:'domcontentloaded',timeout:30000});
+  await page.waitForFunction(()=>!!window.__GAUNTLET_RACES__,null,{timeout:90000});
+  await page.waitForFunction(()=>window.__GAUNTLET_RACES__?.snapshot?.().ready===true&&window.__GAUNTLET_RACES__?.snapshot?.().current==='veylkin',null,{timeout:90000});
   const queryRace=await page.evaluate(()=>window.__GAUNTLET_RACES__.snapshot().current);
   if(queryRace!=='veylkin')throw new Error(`?race= initialization failed: ${queryRace}`);
 }catch(e){
