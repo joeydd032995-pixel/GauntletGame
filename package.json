@@ -1,0 +1,23 @@
+{
+  "name": "gauntlet-game",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "assets:mocap": "node scripts/acquire-mocap.mjs",
+    "qa:visual": "node qa/capture.mjs",
+    "qa:character": "node qa/reference-character-capture.mjs",
+    "qa:character:critic": "node qa/character-critic.mjs",
+    "qa:blind": "node qa/blind-compare.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0",
+    "vite": "^7.1.2"
+  }
+}

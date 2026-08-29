@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "referenceDate": "2026-08-17",
+  "baselines": {
+    "wow": {
+      "name": "World of Warcraft: Midnight",
+      "officialSource": "https://worldofwarcraft.blizzard.com/en-us/news/24264417/world-of-warcraft-midnight%E2%84%A2-now-live",
+      "captureRoot": "qa/references/wow"
+    },
+    "osrs": {
+      "name": "Old School RuneScape - Wyrmscraig-era live client",
+      "officialSource": "https://oldschool.runescape.com/",
+      "captureRoot": "qa/references/osrs"
+    }
+  },
+  "matchRules": {
+    "resolution": "1920x1080 minimum",
+    "crop": "full gameplay frame; no promotional key art",
+    "subjectFrameHeightTolerancePercent": 8,
+    "cameraYawToleranceDegrees": 12,
+    "lighting": "outdoor readable key/fill; no cinematic-only relighting",
+    "hud": "HUD may be hidden only if hidden for both compared captures",
+    "scoringScale": "1-5; 3=tie; Gauntlet must average >=4.0 and win every mandatory axis"
+  },
+  "mandatoryAxes": [
+    "silhouetteReadability",
+    "surfaceMaterialResponse",
+    "armorLayerSeparation",
+    "animationWeight",
+    "anticipation",
+    "followThrough",
+    "footPlanting",
+    "poseClarity",
+    "combatPresence",
+    "overallProductionRead"
+  ],
+  "trials": [
+    {"id":"idle-front","gauntlet":"hero-idle-front.png","wow":"idle-front.png","osrs":"idle-front.png","axes":["silhouetteReadability","surfaceMaterialResponse","armorLayerSeparation","overallProductionRead"]},
+    {"id":"idle-three-quarter","gauntlet":"hero-idle-three-quarter.png","wow":"idle-three-quarter.png","osrs":"idle-three-quarter.png","axes":["silhouetteReadability","surfaceMaterialResponse","armorLayerSeparation","overallProductionRead"]},
+    {"id":"locomotion-walk","gauntlet":"hero-walk-rear.png","wow":"walk-rear.png","osrs":"walk-rear.png","axes":["animationWeight","footPlanting","poseClarity","overallProductionRead"]},
+    {"id":"locomotion-run","gauntlet":"hero-run-rear.png","wow":"run-rear.png","osrs":"run-rear.png","axes":["animationWeight","footPlanting","poseClarity","overallProductionRead"]},
+    {"id":"locomotion-sprint","gauntlet":"hero-sprint-rear.png","wow":"sprint-rear.png","osrs":"sprint-rear.png","axes":["animationWeight","footPlanting","poseClarity","overallProductionRead"]},
+    {"id":"melee-strike","gauntlet":"hero-sever-strike.png","wow":"melee-strike.png","osrs":"melee-strike.png","axes":["anticipation","followThrough","animationWeight","combatPresence","poseClarity"]},
+    {"id":"ability-performance","gauntlet":"hero-rift-performance.png","wow":"ability-performance.png","osrs":"ability-performance.png","axes":["anticipation","followThrough","combatPresence","overallProductionRead"]},
+    {"id":"defense","gauntlet":"hero-parry.png","wow":"defense.png","osrs":"defense.png","axes":["animationWeight","poseClarity","combatPresence"]},
+    {"id":"enemy-attack","gauntlet":"warden-attack.png","wow":"enemy-attack.png","osrs":"enemy-attack.png","axes":["silhouetteReadability","anticipation","followThrough","combatPresence","overallProductionRead"]}
+  ]
+}

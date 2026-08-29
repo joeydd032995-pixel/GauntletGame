@@ -1,0 +1,38 @@
+name: Gauntlet Visual QA
+on:
+  push:
+    branches: ['sol/**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: gauntlet-visual-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Acquire licensed mocap sources
+        run: npm run assets:mocap
+      - run: npm run build
+      - run: npx playwright install chromium
+      - name: Start production preview
+        run: npm run preview -- --port 4173 > /tmp/gauntlet-preview.log 2>&1 &
+      - name: Wait for runtime
+        run: npx --yes wait-on http://127.0.0.1:4173 --timeout 30000
+      - name: Capture gameplay
+        run: npm run qa:visual
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauntlet-visual-evidence
+          path: artifacts/
+          retention-days: 14
