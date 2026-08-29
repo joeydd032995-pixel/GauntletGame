@@ -43,7 +43,15 @@ jobs:
       - name: Clone TripoSR
         run: git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR.git /tmp/TripoSR
       - name: Install TripoSR dependencies
-        run: python -m pip install --disable-pip-version-check -r /tmp/TripoSR/requirements.txt
+        run: |
+          python -m pip install --disable-pip-version-check -r /tmp/TripoSR/requirements.txt
+          python -m pip install --disable-pip-version-check onnxruntime
+          python - <<'PY'
+          import onnxruntime, rembg, torch
+          print('torch', torch.__version__, 'cuda', torch.cuda.is_available())
+          print('onnxruntime', onnxruntime.__version__)
+          print('rembg import OK')
+          PY
       - name: Acquire locked ${{ matrix.race }} A-pose
         run: |
           mkdir -p artifacts/triposr/${{ matrix.race }}
