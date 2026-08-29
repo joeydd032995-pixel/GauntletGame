@@ -16,6 +16,23 @@ const errors=[];page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));p
 const started=Date.now(),marks=[];const mark=name=>marks.push([name,Math.max(.1,(Date.now()-started)/1000)]);let fatal=null,metrics=null,boot=null,failureTelemetry=null;
 const pivotPose=()=>page.evaluate(()=>{const root=window.__GAUNTLET_RACES__?.layer,names=['torso','head','upper_arm_L','upper_arm_R','forearm_L','forearm_R','thigh_L','thigh_R'];const out={};for(const name of names){const o=root?.getObjectByName?.(name);if(o)out[name]=[o.rotation.x,o.rotation.y,o.rotation.z];}return out;});
 const poseChanged=(before,after,names)=>names.some(name=>{const a=before[name],b=after[name];return a&&b&&a.some((v,i)=>Math.abs(v-b[i])>.04);});
+const skinProbe=boneName=>page.evaluate(name=>{
+  const root=window.__GAUNTLET_RACES__?.layer;
+  const meshes=[];root?.traverse?.(o=>{if(o.isSkinnedMesh)meshes.push(o);});
+  for(const mesh of meshes){
+    const boneIndex=mesh.skeleton?.bones?.findIndex(b=>b.name===name);if(boneIndex==null||boneIndex<0)continue;
+    const si=mesh.geometry?.getAttribute?.('skinIndex'),sw=mesh.geometry?.getAttribute?.('skinWeight'),pos=mesh.geometry?.getAttribute?.('position');
+    if(!si||!sw||!pos)continue;
+    for(let i=0;i<pos.count;i++){
+      let hit=false;for(let j=0;j<4;j++)if(si.getComponent(i,j)===boneIndex&&sw.getComponent(i,j)>.15){hit=true;break;}
+      if(!hit)continue;
+      const v=new mesh.position.constructor().fromBufferAttribute(pos,i);
+      mesh.applyBoneTransform(i,v);mesh.localToWorld(v);return [v.x,v.y,v.z];
+    }
+  }
+  return null;
+},boneName);
+const pointMoved=(a,b,eps=.025)=>a&&b&&Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2])>eps;
 try{
   const navStart=Date.now();
   await page.goto('http://127.0.0.1:4173',{waitUntil:'domcontentloaded',timeout:20000});
@@ -58,10 +75,10 @@ try{
     await page.waitForFunction(r=>{const s=window.__GAUNTLET_RACES__?.snapshot?.();return s?.ready===true&&s?.current===r&&s?.lod==='hero'&&s?.lodReady?.hero===true&&(s?.heroTriangles||0)>=5500;},race,{timeout:45000});
     await page.waitForTimeout(500);
     const snap=await page.evaluate(()=>window.__GAUNTLET_RACES__.snapshot());
-    if(snap.productionMesh!==false||snap.rigType!=='articulated-rigid-part')throw new Error(`race contract drift: ${JSON.stringify(snap)}`);
+    if(snap.productionMesh!==true||snap.skinnedMesh!==true||snap.rigType!=='skinned-humanoid'||snap.skinning!=='weighted-skeletal'||(snap.skinnedMeshes||0)<1||(snap.bones||0)<20)throw new Error(`race skin contract drift: ${JSON.stringify(snap)}`);
     const expected=expectedReferenceLocks[race],lock=snap.referenceLock;
-    if(!lock||snap.generatorVersion!=='3.0.0-reference-locked'||lock.elementId!==expected.elementId||lock.aPoseJob!==expected.aPoseJob||lock.turnaroundJob!==expected.turnaroundJob||lock.detailJob!==expected.detailJob||lock.turnaroundResolution!=='4k')throw new Error(`race reference provenance drift: ${JSON.stringify(snap)}`);
-    raceEvidence.push({race,heroTriangles:snap.heroTriangles,activeTriangles:snap.triangles,lod:snap.lod,lodReady:snap.lodReady,elementId:snap.elementId,generatorVersion:snap.generatorVersion,referenceLock:lock});
+    if(!lock||snap.generatorVersion!=='4.0.0-reference-locked-skinned'||lock.elementId!==expected.elementId||lock.aPoseJob!==expected.aPoseJob||lock.turnaroundJob!==expected.turnaroundJob||lock.detailJob!==expected.detailJob||lock.turnaroundResolution!=='4k')throw new Error(`race reference provenance drift: ${JSON.stringify(snap)}`);
+    raceEvidence.push({race,heroTriangles:snap.heroTriangles,activeTriangles:snap.triangles,skinnedMeshes:snap.skinnedMeshes,bones:snap.bones,lod:snap.lod,lodReady:snap.lodReady,elementId:snap.elementId,generatorVersion:snap.generatorVersion,referenceLock:lock});
     mark(`${String(i+1).padStart(2,'0')}-race-${race}-1080p.png`);
   }
 
@@ -77,20 +94,21 @@ try{
   await page.evaluate(()=>window.__GAUNTLET_RACES__.setRace('echoed'));
   await page.waitForFunction(()=>window.__GAUNTLET_RACES__?.snapshot?.().current==='echoed');
 
-  const idlePose=await pivotPose();
-  await page.keyboard.press('1');await page.waitForTimeout(100);const attackPose=await pivotPose();
-  if(!poseChanged(idlePose,attackPose,['torso','upper_arm_R','forearm_R']))throw new Error('attack rigid-part articulation did not move required pivots');
+  const idlePose=await pivotPose(),idleSkin=await skinProbe('upper_arm_R');
+  await page.keyboard.press('1');await page.waitForTimeout(100);const attackPose=await pivotPose(),attackSkin=await skinProbe('upper_arm_R');
+  if(!poseChanged(idlePose,attackPose,['torso','upper_arm_R','forearm_R']))throw new Error('attack skeletal articulation did not move required bones');
+  if(!pointMoved(idleSkin,attackSkin))throw new Error(`attack changed bones but did not deform weighted skin: ${JSON.stringify({idleSkin,attackSkin})}`);
   await page.waitForTimeout(700);
   const resetPose=await pivotPose();await page.keyboard.press('2');await page.waitForTimeout(100);const riftPose=await pivotPose();
-  if(!poseChanged(resetPose,riftPose,['upper_arm_L','upper_arm_R','forearm_L','forearm_R']))throw new Error('Rift rigid-part articulation did not move required pivots');
+  if(!poseChanged(resetPose,riftPose,['upper_arm_L','upper_arm_R','forearm_L','forearm_R']))throw new Error('Rift skeletal articulation did not move required bones');
   await page.waitForTimeout(700);const guardBase=await pivotPose();await page.keyboard.press('3');await page.waitForTimeout(100);const guardPose=await pivotPose();
-  if(!poseChanged(guardBase,guardPose,['upper_arm_L','upper_arm_R','forearm_L','forearm_R']))throw new Error('Guard rigid-part articulation did not move required pivots');
+  if(!poseChanged(guardBase,guardPose,['upper_arm_L','upper_arm_R','forearm_L','forearm_R']))throw new Error('Guard skeletal articulation did not move required bones');
 
   await page.evaluate(()=>window.__GAUNTLET_RACES__.setLodOverride?.(null));
   await page.mouse.click(960,540);await page.keyboard.down('w');await page.waitForTimeout(650);await page.keyboard.down('Shift');await page.waitForTimeout(650);mark('06-locomotion-1080p.png');await page.keyboard.up('Shift');await page.keyboard.up('w');
   await page.keyboard.press('1');await page.waitForTimeout(140);mark('07-melee-impact-1080p.png');await page.waitForTimeout(480);
   await page.keyboard.press('2');await page.waitForTimeout(110);mark('08-rift-vfx-1080p.png');await page.waitForTimeout(650);
-  const dodgeBase=await pivotPose();await page.keyboard.press('Space');await page.waitForTimeout(140);const dodgePose=await pivotPose();if(!poseChanged(dodgeBase,dodgePose,['torso']))throw new Error('Dodge rigid-part articulation did not move torso pivot');mark('09-evade-1080p.png');await page.waitForTimeout(2200);
+  const dodgeBase=await pivotPose();await page.keyboard.press('Space');await page.waitForTimeout(140);const dodgePose=await pivotPose();if(!poseChanged(dodgeBase,dodgePose,['torso']))throw new Error('Dodge skeletal articulation did not move torso bone');mark('09-evade-1080p.png');await page.waitForTimeout(2200);
   metrics=await page.evaluate(raceEvidence=>({runtime:window.__GAUNTLET_METRICS__||null,races:window.__GAUNTLET_RACES__?.snapshot?.()||null,raceEvidence,authored:JSON.parse(JSON.stringify(window.__GAUNTLET_AUTHORED_CHARACTERS__||null)),hybridEnvironment:window.__GAUNTLET_HYBRID_ENVIRONMENT__||null,groundDetail:window.__GAUNTLET_GROUND_DETAIL__||null,terrainMaterial:window.__GAUNTLET_TERRAIN_MATERIAL__||null,streamingEnvironment:window.__GAUNTLET_STREAMING_ENVIRONMENT__||null}),raceEvidence);
 
   await page.goto('http://127.0.0.1:4173/?race=veylkin',{waitUntil:'domcontentloaded',timeout:30000});
